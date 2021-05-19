@@ -1,6 +1,8 @@
 /build*
 /docker_build
+/cmake-build-*
 .vscode
+.idea
 #*
 *~
 .DS_Store
