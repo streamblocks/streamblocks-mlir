@@ -2285,6 +2285,43 @@ private:
   std::vector<std::unique_ptr<StructureStmt>> structure;
 };
 
+class NamespaceDecl {
+public:
+  NamespaceDecl(Location location, std::unique_ptr<QID> qid,
+                std::vector<std::unique_ptr<Import>> imports,
+                std::vector<std::unique_ptr<GlobalVarDecl>> varDecls,
+                std::vector<std::unique_ptr<GlobalEntityDecl>> entityDecls,
+                std::vector<std::unique_ptr<GlobalTypeDecl>> typeDecl)
+      : location(location), qid(std::move(qid)), imports(std::move(imports)),
+        varDecls(std::move(varDecls)), entityDecls(std::move(entityDecls)),
+        typeDecl(std::move(typeDecl)) {}
+
+private:
+  virtual ~NamespaceDecl() = default;
+
+  const Location &loc() { return location; }
+  QID *getQID() { return qid.get(); }
+
+  llvm::ArrayRef<std::unique_ptr<Import>> getImports() { return imports; }
+  llvm::ArrayRef<std::unique_ptr<GlobalVarDecl>> getvarDecls() {
+    return varDecls;
+  }
+  llvm::ArrayRef<std::unique_ptr<GlobalEntityDecl>> getEntityDecls() {
+    return entityDecls;
+  }
+  llvm::ArrayRef<std::unique_ptr<GlobalTypeDecl>> getTypeDecls() {
+    return typeDecl;
+  }
+
+private:
+  Location location;
+  std::unique_ptr<QID> qid;
+  std::vector<std::unique_ptr<Import>> imports;
+  std::vector<std::unique_ptr<GlobalVarDecl>> varDecls;
+  std::vector<std::unique_ptr<GlobalEntityDecl>> entityDecls;
+  std::vector<std::unique_ptr<GlobalTypeDecl>> typeDecl;
+};
+
 } // namespace cal
 
 #endif
