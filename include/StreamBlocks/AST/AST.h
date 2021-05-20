@@ -33,6 +33,7 @@ class TypeExpr;
 class GeneratorVarDecl;
 class Decl;
 class Pattern;
+class Entity;
 
 struct Location {
   int from_line{0};
@@ -145,59 +146,6 @@ private:
   Location location;
   std::string name;
 };
-
-/*
-class ToolAttribute {
-public:
-  enum ToolAttributeKind { ToolAttribute_VALUE, ToolAttribute_TYPE };
-
-  ToolAttribute(ToolAttributeKind kind, Location location, std::string name)
-      : kind(kind), location(location), name(name) {}
-
-  virtual ~ToolAttribute() = default;
-
-  ToolAttributeKind getKind() const { return kind; }
-  const Location &loc() { return location; }
-  llvm::StringRef getName() { return name; }
-
-private:
-  const ToolAttributeKind kind;
-  Location location;
-  std::string name:
-};
-
-class ToolTypeAttribute : ToolAttribute {
-public:
-  ToolTypeAttribute(Location location, std::string name,
-std::unique_ptr<TypeExpr> type) : ToolAttribute(ToolAttribute_TYPE, location,
-name), type(std::move(type)) {}
-
-  TypeExpr *getType() { return type.get(); }
-
-  /// LLVM style RTTI
-  static bool classof(const ToolAttribute *c) {
-    return c->getKind() == ToolAttribute_TYPE;
-  }
-private:
-  std::unique_ptr<TypeExpr> type;
-};
-
-class ToolValueAttribute : ToolAttribute {
-public:
-  ToolValueAttribute(Location location, std::string name,
-std::unique_ptr<Expression> value) : ToolAttribute(ToolAttribute_TYPE, location,
-name), value(std::move(value)) {}
-
-  Expression *getValue() { return value.get(); }
-
-  /// LLVM style RTTI
-  static bool classof(const ToolAttribute *c) {
-    return c->getKind() == ToolAttribute_VALUE;
-  }
-private:
-  std::unique_ptr<Expression> value;
-};
-*/
 
 /// Base class for all type parameters nodes.
 class Parameter {
@@ -328,6 +276,28 @@ public:
 
 private:
   std::unique_ptr<TypeExpr> type;
+};
+
+class GlobalEntityDecl : Decl, GlobalDecl {
+public:
+  GlobalEntityDecl(Location location, std::string name,
+                   std::unique_ptr<Entity> entity, Availability availability,
+                   bool external)
+      : Decl(Decl_Global_Entity, location, name), entity(std::move(entity)),
+        availability(availability), external(external) {}
+
+  Entity *getEntity() { return entity.get(); }
+  Availability getAvailability() override { return availability; }
+  bool getExternal() const { return external; }
+
+  static bool classof(const Decl *c) {
+    return c->getKind() == Decl_Global_Entity;
+  }
+
+private:
+  std::unique_ptr<Entity> entity;
+  const Availability availability;
+  const bool external;
 };
 
 class ParameterTypeDecl : TypeDecl {
@@ -1526,6 +1496,217 @@ private:
   std::unique_ptr<Expression> repeat;
 };
 
+/// Base class for Match node.
+class Match {
+public:
+  Match(Location location, std::unique_ptr<InputVarDecl> declaration,
+        std::unique_ptr<ExprCase> expression)
+      : location(location), declaration(std::move(declaration)),
+        expression(std::move(expression)) {}
+  virtual ~Match() = default;
+
+  const Location &loc() { return location; }
+
+  InputVarDecl *getDeclaration() { return declaration.get(); }
+  ExprCase *getExpression() { return expression.get(); }
+
+private:
+  Location location;
+  std::unique_ptr<InputVarDecl> declaration;
+  std::unique_ptr<ExprCase> expression;
+};
+
+/// Base class for Input Pattern node.
+class InputPattern {
+public:
+  InputPattern(Location location, std::unique_ptr<Port> port,
+               std::vector<std::unique_ptr<InputVarDecl>> variables,
+               std::unique_ptr<Expression> repeat)
+      : location(location), port(std::move(port)),
+        variables(std::move(variables)), repeat(std::move(repeat)) {}
+
+  virtual ~InputPattern() = default;
+  const Location &loc() { return location; }
+  llvm::ArrayRef<std::unique_ptr<InputVarDecl>> getVariables() {
+    return variables;
+  }
+  Expression *getRepeat() { return repeat.get(); }
+
+private:
+  Location location;
+  // TDDO: Replace with Match
+  std::unique_ptr<Port> port;
+  std::vector<std::unique_ptr<InputVarDecl>> variables;
+  std::unique_ptr<Expression> repeat;
+};
+
+/// Base class for Input Pattern node.
+class OutputExpression {
+public:
+  OutputExpression(Location location, std::unique_ptr<Port> port,
+                   std::vector<std::unique_ptr<Expression>> variables,
+                   std::unique_ptr<Expression> repeat)
+      : location(location), port(std::move(port)), values(std::move(variables)),
+        repeat(std::move(repeat)) {}
+
+  virtual ~OutputExpression() = default;
+  const Location &loc() { return location; }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getValues() { return values; }
+  Expression *getRepeat() { return repeat.get(); }
+
+private:
+  Location location;
+  // TDDO: Replace with Match
+  std::unique_ptr<Port> port;
+  std::vector<std::unique_ptr<Expression>> values;
+  std::unique_ptr<Expression> repeat;
+};
+
+/// Base class for Process Description node.
+class ProcessDescription {
+public:
+  ProcessDescription(Location location,
+                     std::vector<std::unique_ptr<Statement>> statements,
+                     bool repeated)
+      : location(location), statements(std::move(statements)),
+        repeated(repeated) {}
+
+  virtual ~ProcessDescription() = default;
+
+  llvm::ArrayRef<std::unique_ptr<Statement>> getStatements() {
+    return statements;
+  }
+  bool getRepeated() const { return repeated; }
+
+  const Location &loc() { return location; }
+
+private:
+  Location location;
+  std::vector<std::unique_ptr<Statement>> statements;
+  const bool repeated;
+};
+
+/// Base class for Action node.
+class Action {
+public:
+  Action(Location location,
+         std::vector<std::unique_ptr<Annotation>> annotations,
+         std::unique_ptr<QID> tag,
+         std::vector<std::unique_ptr<InputPattern>> inputPatterns,
+         std::vector<std::unique_ptr<OutputExpression>> outputExpressions,
+         std::vector<std::unique_ptr<TypeDecl>> typeDecls,
+         std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
+         std::vector<std::unique_ptr<Expression>> guards,
+         std::vector<std::unique_ptr<Statement>> body,
+         std::unique_ptr<Expression> delay)
+      : location(location), annotations(std::move(annotations)),
+        tag(std::move(tag)), inputPatterns(std::move(inputPatterns)),
+        outputExpressions(std::move(outputExpressions)),
+        typeDecls(std::move(typeDecls)), varDecls(std::move(varDecls)),
+        guards(std::move(guards)), body(std::move(body)),
+        delay(std::move(delay)) {}
+
+  virtual ~Action() = default;
+  const Location &loc() { return location; }
+
+  llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
+    return annotations;
+  }
+
+  QID *getTag() { return tag.get(); }
+
+  llvm::ArrayRef<std::unique_ptr<InputPattern>> getInputPatterns() {
+    return inputPatterns;
+  }
+  llvm::ArrayRef<std::unique_ptr<OutputExpression>> getOutputExpressions() {
+    return outputExpressions;
+  }
+  llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecl() { return typeDecls; }
+  llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
+    return varDecls;
+  }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getGuards() { return guards; }
+  llvm::ArrayRef<std::unique_ptr<Statement>> getBody() { return body; }
+  Expression *getDelay() { return delay.get(); }
+
+private:
+  Location location;
+  std::vector<std::unique_ptr<Annotation>> annotations;
+  std::unique_ptr<QID> tag;
+  std::vector<std::unique_ptr<InputPattern>> inputPatterns;
+  std::vector<std::unique_ptr<OutputExpression>> outputExpressions;
+  std::vector<std::unique_ptr<TypeDecl>> typeDecls;
+  std::vector<std::unique_ptr<LocalVarDecl>> varDecls;
+  std::vector<std::unique_ptr<Expression>> guards;
+  std::vector<std::unique_ptr<Statement>> body;
+  std::unique_ptr<Expression> delay;
+};
+
+/// Base class for Priority node.
+class Priority {
+public:
+  Priority(Location location, std::unique_ptr<QID> high,
+           std::unique_ptr<QID> low)
+      : location(location), high(std::move(high)), low(std::move(low)) {}
+
+  virtual ~Priority() = default;
+
+  const Location &loc() { return location; }
+
+  QID *getHigh() { return high.get(); }
+  QID *getLow() { return low.get(); }
+
+private:
+  Location location;
+  std::unique_ptr<QID> high;
+  std::unique_ptr<QID> low;
+};
+
+/// Base class for Transition node.
+class Transition {
+public:
+  Transition(Location location, std::string sourceState,
+             std::string targetState,
+             std::vector<std::unique_ptr<QID>> actionTag)
+      : location(location), sourceState(sourceState), targetState(targetState),
+        actionTag(std::move(actionTag)) {}
+
+  virtual ~Transition() = default;
+
+  const Location &loc() { return location; }
+  llvm::StringRef getSourceState() { return sourceState; }
+  llvm::StringRef getTargetState() { return targetState; }
+  llvm::ArrayRef<std::unique_ptr<QID>> getActionTag() { return actionTag; }
+
+private:
+  Location location;
+  std::string sourceState;
+  std::string targetState;
+  std::vector<std::unique_ptr<QID>> actionTag;
+};
+
+/// Base class for Schedule FSM node.
+class ScheduleFSM {
+public:
+  ScheduleFSM(Location location, std::string initialState,
+              std::vector<std::unique_ptr<Transition>> transitions)
+      : location(location), initialState(initialState),
+        transitions(std::move(transitions)) {}
+
+  virtual ~ScheduleFSM() = default;
+
+  const Location &loc() { return location; }
+  std::string getInitialState() { return initialState; }
+  llvm::ArrayRef<std::unique_ptr<Transition>> getTransitions() {
+    return transitions;
+  }
+
+private:
+  Location location;
+  std::string initialState;
+  std::vector<std::unique_ptr<Transition>> transitions;
+};
+
 /// Base class for all regexp nodes.
 class RegExp {
 public:
@@ -1593,121 +1774,515 @@ private:
   std::unique_ptr<RegExp> lhs, rhs;
 };
 
-/// Base class for Match node.
-class Match {
+/// Base class for all Entity nodes.
+class Entity {
 public:
-  Match(Location location, std::unique_ptr<InputVarDecl> declaration,
-        std::unique_ptr<ExprCase> expression)
-      : location(location), declaration(std::move(declaration)),
-        expression(std::move(expression)) {}
-  virtual ~Match() = default;
+  enum EntityKind { Entity_Actor, Entity_Network, Entity_AM };
 
-  const Location &loc() { return location; }
-
-  InputVarDecl *getDeclaration() { return declaration.get(); }
-  ExprCase *getExpression() { return expression.get(); }
-
-private:
-  Location location;
-  std::unique_ptr<InputVarDecl> declaration;
-  std::unique_ptr<ExprCase> expression;
-};
-
-/// Base class for Input Pattern node.
-class InputPattern {
-public:
-  InputPattern(Location location, std::unique_ptr<Port> port,
-               std::vector<std::unique_ptr<InputVarDecl>> variables,
-               std::unique_ptr<Expression> repeat)
-      : location(location), port(std::move(port)),
-        variables(std::move(variables)), repeat(std::move(repeat)) {}
-
-  virtual ~InputPattern() = default;
-  const Location &loc() { return location; }
-  llvm::ArrayRef<std::unique_ptr<InputVarDecl>> getVariables() {
-    return variables;
-  }
-  Expression *getRepeat() { return repeat.get(); }
-
-private:
-  Location location;
-  // TDDO: Replace with Match
-  std::unique_ptr<Port> port;
-  std::vector<std::unique_ptr<InputVarDecl>> variables;
-  std::unique_ptr<Expression> repeat;
-};
-
-/// Base class for Input Pattern node.
-class OutputExpression {
-public:
-  OutputExpression(Location location, std::unique_ptr<Port> port,
-                   std::vector<std::unique_ptr<Expression>> variables,
-                   std::unique_ptr<Expression> repeat)
-      : location(location), port(std::move(port)), values(std::move(variables)),
-        repeat(std::move(repeat)) {}
-
-  virtual ~OutputExpression() = default;
-  const Location &loc() { return location; }
-  llvm::ArrayRef<std::unique_ptr<Expression>> getValues() { return values; }
-  Expression *getRepeat() { return repeat.get(); }
-
-private:
-  Location location;
-  // TDDO: Replace with Match
-  std::unique_ptr<Port> port;
-  std::vector<std::unique_ptr<Expression>> values;
-  std::unique_ptr<Expression> repeat;
-};
-
-/// Base class for Action node.
-class Action {
-public:
-  Action(Location location,
+  Entity(EntityKind kind, Location location, std::string name,
          std::vector<std::unique_ptr<Annotation>> annotations,
-         std::vector<std::unique_ptr<InputPattern>> inputPatterns,
-         std::vector<std::unique_ptr<OutputExpression>> outputExpressions,
-         std::vector<std::unique_ptr<TypeDecl>> typeDecls,
-         std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
-         std::vector<std::unique_ptr<Expression>> guards,
-         std::vector<std::unique_ptr<Statement>> body,
-         std::unique_ptr<Expression> delay)
-      : location(location), annotations(std::move(annotations)),
-        inputPatterns(std::move(inputPatterns)),
-        outputExpressions(std::move(outputExpressions)),
-        typeDecls(std::move(typeDecls)), varDecls(std::move(varDecls)),
-        guards(std::move(guards)), body(std::move(body)),
-        delay(std::move(delay)) {}
+         std::vector<std::unique_ptr<PortDecl>> inputPorts,
+         std::vector<std::unique_ptr<PortDecl>> outputPorts,
+         std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+         std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters)
+      : kind(kind), location(location), name(name),
+        annotations(std::move(annotations)), inputPorts(std::move(inputPorts)),
+        outputPorts(std::move(outputPorts)),
+        typeParameters(std::move(typeParameters)),
+        valueParameters(std::move(valueParameters)) {}
 
-  virtual ~Action() = default;
+  virtual ~Entity() = default;
+
+  EntityKind getKind() const { return kind; }
+
   const Location &loc() { return location; }
 
-  llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
-    return annotations;
-  }
-  llvm::ArrayRef<std::unique_ptr<InputPattern>> getInputPatterns() {
-    return inputPatterns;
-  }
-  llvm::ArrayRef<std::unique_ptr<OutputExpression>> getOutputExpressions() {
-    return outputExpressions;
-  }
-  llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecl() { return typeDecls; }
+private:
+  const EntityKind kind;
+  Location location;
+  std::string name;
+  std::vector<std::unique_ptr<Annotation>> annotations;
+  std::vector<std::unique_ptr<PortDecl>> inputPorts;
+  std::vector<std::unique_ptr<PortDecl>> outputPorts;
+  std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
+  std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
+};
+
+class CalActor : Entity {
+public:
+  CalActor(Location &location, std::string name,
+           std::vector<std::unique_ptr<Annotation>> annotations,
+           std::vector<std::unique_ptr<PortDecl>> inputPorts,
+           std::vector<std::unique_ptr<PortDecl>> outputPorts,
+           std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+           std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters,
+           std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
+           std::vector<std::unique_ptr<TypeDecl>> typeDecls,
+           std::vector<std::unique_ptr<Expression>> invariants,
+           std::vector<std::unique_ptr<Action>> actions,
+           std::vector<std::unique_ptr<Action>> initializers,
+           std::unique_ptr<ScheduleFSM> scheduleFsm,
+           std::unique_ptr<RegExp> scheduleRegExp,
+           std::vector<std::unique_ptr<QID>> priorities)
+      : Entity(Entity_Actor, location, name, std::move(annotations),
+               std::move(inputPorts), std::move(outputPorts),
+               std::move(typeParameters), std::move(valueParameters)),
+        varDecls(std::move(varDecls)), typeDecls(std::move(typeDecls)),
+        invariants(std::move(invariants)), actions(std::move(actions)),
+        initializers(std::move(initializers)),
+        scheduleFSM(std::move(scheduleFsm)),
+        scheduleRegExp(std::move(scheduleRegExp)),
+        priorities(std::move(priorities)) {}
+
   llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
     return varDecls;
   }
-  llvm::ArrayRef<std::unique_ptr<Expression>> getGuards() { return guards; }
-  llvm::ArrayRef<std::unique_ptr<Statement>> getBody() { return body; }
-  Expression *getDelay() { return delay.get(); }
+  llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecls() { return typeDecls; }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getInvariants() {
+    return invariants;
+  }
+  llvm::ArrayRef<std::unique_ptr<Action>> getActions() { return actions; }
+  llvm::ArrayRef<std::unique_ptr<Action>> getInitializers() {
+    return initializers;
+  }
+  ScheduleFSM *getScheduleFSM() { return scheduleFSM.get(); }
+  RegExp *getScheduleRegExp() { return scheduleRegExp.get(); }
+  llvm::ArrayRef<std::unique_ptr<QID>> getPriorities() { return priorities; }
+
+  /// LLVM style RTTI
+  static bool classof(const Entity *c) { return c->getKind() == Entity_Actor; }
+
+private:
+  std::vector<std::unique_ptr<LocalVarDecl>> varDecls;
+  std::vector<std::unique_ptr<TypeDecl>> typeDecls;
+  std::vector<std::unique_ptr<Expression>> invariants;
+  std::vector<std::unique_ptr<Action>> actions;
+  std::vector<std::unique_ptr<Action>> initializers;
+  std::unique_ptr<ScheduleFSM> scheduleFSM;
+  std::unique_ptr<RegExp> scheduleRegExp;
+  std::vector<std::unique_ptr<QID>> priorities;
+};
+
+/// Base class for all ToolAttribute nodes.
+class ToolAttribute {
+public:
+  enum ToolAttributeKind { ToolAttribute_VALUE, ToolAttribute_TYPE };
+
+  ToolAttribute(ToolAttributeKind kind, Location location, std::string name)
+      : kind(kind), location(location), name(name) {}
+
+  virtual ~ToolAttribute() = default;
+
+  ToolAttributeKind getKind() const { return kind; }
+  const Location &loc() { return location; }
+  llvm::StringRef getName() { return name; }
+
+private:
+  const ToolAttributeKind kind;
+  Location location;
+  std::string name;
+};
+
+class ToolTypeAttribute : ToolAttribute {
+public:
+  ToolTypeAttribute(Location location, std::string name,
+                    std::unique_ptr<TypeExpr> type)
+      : ToolAttribute(ToolAttribute_TYPE, location, name),
+        type(std::move(type)) {}
+
+  TypeExpr *getType() { return type.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const ToolAttribute *c) {
+    return c->getKind() == ToolAttribute_TYPE;
+  }
+
+private:
+  std::unique_ptr<TypeExpr> type;
+};
+
+class ToolValueAttribute : ToolAttribute {
+public:
+  ToolValueAttribute(Location location, std::string name,
+                     std::unique_ptr<Expression> value)
+      : ToolAttribute(ToolAttribute_TYPE, location, name),
+        value(std::move(value)) {}
+
+  Expression *getValue() { return value.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const ToolAttribute *c) {
+    return c->getKind() == ToolAttribute_VALUE;
+  }
+
+private:
+  std::unique_ptr<Expression> value;
+};
+
+/// Base class for all Entity Expression nodes.
+class EntityReference {
+public:
+  enum EntityReferenceKind { EntityRef_Local, EntityRef_Global };
+  EntityReference(EntityReferenceKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~EntityReference() = default;
+
+  EntityReferenceKind getKind() const { return kind; }
+
+  const Location &loc() { return location; }
+
+private:
+  const EntityReferenceKind kind;
+  Location location;
+};
+
+class EntityRefLocal : EntityReference {
+public:
+  EntityRefLocal(Location location, std::string name)
+      : EntityReference(EntityRef_Local, location), name(name) {}
+
+  llvm::StringRef getName() { return name; }
+  /// LLVM style RTTI
+  static bool classof(const EntityReference *c) {
+    return c->getKind() == EntityRef_Local;
+  }
+
+private:
+  std::string name;
+};
+
+class EntityRefGlobal : EntityReference {
+public:
+  EntityRefGlobal(Location location, std::unique_ptr<QID> globalName)
+      : EntityReference(EntityRef_Global, location),
+        globalName(std::move(globalName)) {}
+
+  QID *getGlobalName() { return globalName.get(); }
+  /// LLVM style RTTI
+  static bool classof(const EntityReference *c) {
+    return c->getKind() == EntityRef_Global;
+  }
+
+private:
+  std::unique_ptr<QID> globalName;
+};
+
+class Attributable {
+public:
+  Attributable(std::vector<std::unique_ptr<ToolAttribute>> attributes)
+      : attributes(std::move(attributes)) {}
+
+  virtual ~Attributable() = default;
+
+  llvm::ArrayRef<std::unique_ptr<ToolAttribute>> getAttributes() {
+    return attributes;
+  }
+
+private:
+  std::vector<std::unique_ptr<ToolAttribute>> attributes;
+};
+
+/// Base class for all Entity Expression nodes.
+class EntityExpr {
+public:
+  enum EntityExprKind {
+    EntityExpr_Comprehension,
+    EntityExpr_If,
+    EntityExpr_Instance,
+    EntityExpr_Lists
+  };
+
+  EntityExpr(EntityExprKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~EntityExpr() = default;
+
+  EntityExprKind getKind() const { return kind; }
+
+  const Location &loc() { return location; }
+
+private:
+  const EntityExprKind kind;
+  Location location;
+};
+
+class EntityComprehensionExpr : EntityExpr {
+public:
+  EntityComprehensionExpr(Location location,
+                          std::unique_ptr<Generator> generator,
+                          std::vector<std::unique_ptr<Expression>> filters,
+                          std::unique_ptr<EntityExpr> collection)
+      : EntityExpr(EntityExpr_Comprehension, location),
+        generator(std::move(generator)), filters(std::move(filters)),
+        collection(std::move(collection)) {}
+
+  Generator *getGenerator() { return generator.get(); }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
+  EntityExpr *getCollection() { return collection.get(); }
+  /// LLVM style RTTI
+  static bool classof(const EntityExpr *c) {
+    return c->getKind() == EntityExpr_Comprehension;
+  }
+
+private:
+  std::unique_ptr<Generator> generator;
+  std::vector<std::unique_ptr<Expression>> filters;
+  std::unique_ptr<EntityExpr> collection;
+};
+
+class EntityIfExpr : EntityExpr {
+public:
+  EntityIfExpr(Location location, std::unique_ptr<Expression> condition,
+               std::unique_ptr<EntityExpr> trueEntity,
+               std::unique_ptr<EntityExpr> falseEntity)
+      : EntityExpr(EntityExpr_If, location), condition(std::move(condition)),
+        trueEntity(std::move(trueEntity)), falseEntity(std::move(falseEntity)) {
+  }
+
+  Expression *getCondition() { return condition.get(); }
+  EntityExpr *getTrueEntity() { return trueEntity.get(); }
+  EntityExpr *getFalseEntity() { return falseEntity.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const EntityExpr *c) {
+    return c->getKind() == EntityExpr_If;
+  }
+
+private:
+  std::unique_ptr<Expression> condition;
+  std::unique_ptr<EntityExpr> trueEntity;
+  std::unique_ptr<EntityExpr> falseEntity;
+};
+
+class EntityInstanceExpr : EntityExpr, Attributable {
+public:
+  EntityInstanceExpr(
+      Location location, std::vector<std::unique_ptr<ToolAttribute>> attributes,
+      std::unique_ptr<EntityReference> entity,
+      std::vector<std::unique_ptr<TypeParameter>> typeParameters,
+      std::vector<std::unique_ptr<ValueParameter>> valueParameters)
+      : EntityExpr(EntityExpr_Instance, location),
+        Attributable(std::move(attributes)), entity(std::move(entity)),
+        typeParameters(std::move(typeParameters)),
+        valueParameters(std::move(valueParameters)) {}
+
+  EntityReference *getEntity() { return entity.get(); }
+  llvm::ArrayRef<std::unique_ptr<TypeParameter>> getTypeParameters() {
+    return typeParameters;
+  }
+  llvm::ArrayRef<std::unique_ptr<ValueParameter>> getValueParameters() {
+    return valueParameters;
+  }
+  /// LLVM style RTTI
+  static bool classof(const EntityExpr *c) {
+    return c->getKind() == EntityExpr_Instance;
+  }
+
+private:
+  std::unique_ptr<EntityReference> entity;
+  std::vector<std::unique_ptr<TypeParameter>> typeParameters;
+  std::vector<std::unique_ptr<ValueParameter>> valueParameters;
+};
+
+class EntityListExpr : EntityExpr {
+public:
+  EntityListExpr(Location location,
+                 std::vector<std::unique_ptr<EntityExpr>> entityList)
+      : EntityExpr(EntityExpr_Lists, location),
+        entityList(std::move(entityList)) {}
+
+  llvm::ArrayRef<std::unique_ptr<EntityExpr>> getEntityList() {
+    return entityList;
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const EntityExpr *c) {
+    return c->getKind() == EntityExpr_Lists;
+  }
+
+private:
+  std::vector<std::unique_ptr<EntityExpr>> entityList;
+};
+
+/// Base class for Port Reference node.
+class PortReference {
+public:
+  PortReference(Location location, std::string portName, std::string entityName,
+                std::vector<std::unique_ptr<Expression>> entityIndex)
+      : location(location), portName(portName), entityName(entityName),
+        entityIndex(std::move(entityIndex)) {}
+
+  virtual ~PortReference() = default;
+
+  const Location &loc() { return location; }
+  llvm::StringRef getPortName() { return portName; }
+  llvm::StringRef getEntityName() { return entityName; }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getEntityIndex() {
+    return entityIndex;
+  }
 
 private:
   Location location;
-  std::vector<std::unique_ptr<Annotation>> annotations;
-  std::vector<std::unique_ptr<InputPattern>> inputPatterns;
-  std::vector<std::unique_ptr<OutputExpression>> outputExpressions;
+  std::string portName, entityName;
+  std::vector<std::unique_ptr<Expression>> entityIndex;
+};
+
+/// Base class for all Structure Statement nodes.
+class StructureStmt {
+public:
+  enum StructureStmtKind {
+    StructureStmt_Connection,
+    StructureStmt_Foreach,
+    StructureStmt_If
+  };
+
+  StructureStmt(StructureStmtKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~StructureStmt() = default;
+
+  StructureStmtKind getKind() const { return kind; }
+
+  const Location &loc() { return location; }
+
+private:
+  const StructureStmtKind kind;
+  Location location;
+};
+
+class StructureConnectionStmt : StructureStmt {
+public:
+  StructureConnectionStmt(Location location, std::unique_ptr<PortReference> src,
+                          std::unique_ptr<PortReference> dst)
+      : StructureStmt(StructureStmt_Connection, location), src(std::move(src)),
+        dst(std::move(dst)) {}
+
+  PortReference *getSource() { return src.get(); }
+  PortReference *getDestination() { return dst.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const StructureStmt *c) {
+    return c->getKind() == StructureStmt_Connection;
+  }
+
+private:
+  std::unique_ptr<PortReference> src, dst;
+};
+
+class StructureForeachStmt : StructureStmt {
+public:
+  StructureForeachStmt(Location location, std::unique_ptr<Generator> generator,
+                       std::vector<std::unique_ptr<Expression>> filters,
+                       std::vector<std::unique_ptr<Statement>> statements)
+      : StructureStmt(StructureStmt_Foreach, location),
+        generator(std::move(generator)), filters(std::move(filters)),
+        statements(std::move(statements)) {}
+
+  Generator *getGenerator() { return generator.get(); }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
+  llvm::ArrayRef<std::unique_ptr<Statement>> getStatements() {
+    return statements;
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const StructureStmt *c) {
+    return c->getKind() == StructureStmt_Foreach;
+  }
+
+private:
+  std::unique_ptr<Generator> generator;
+  std::vector<std::unique_ptr<Expression>> filters;
+  std::vector<std::unique_ptr<Statement>> statements;
+};
+
+class StructureIfStmt : StructureStmt {
+public:
+  StructureIfStmt(Location location, std::unique_ptr<Expression> condition,
+                  std::vector<std::unique_ptr<StructureStmt>> trueStmt,
+                  std::vector<std::unique_ptr<StructureStmt>> falseStmt)
+      : StructureStmt(StructureStmt_If, location),
+        condition(std::move(condition)), trueStmt(std::move(trueStmt)),
+        falseStmt(std::move(falseStmt)) {}
+
+  Expression *getCondition() { return condition.get(); }
+
+  llvm::ArrayRef<std::unique_ptr<StructureStmt>> getTrueStmt() {
+    return trueStmt;
+  }
+
+  llvm::ArrayRef<std::unique_ptr<StructureStmt>> getFalseStmt() {
+    return falseStmt;
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const StructureStmt *c) {
+    return c->getKind() == StructureStmt_If;
+  }
+
+private:
+  std::unique_ptr<Expression> condition;
+  std::vector<std::unique_ptr<StructureStmt>> trueStmt;
+  std::vector<std::unique_ptr<StructureStmt>> falseStmt;
+};
+
+class InstanceDecl {
+public:
+  InstanceDecl(Location location, std::string name,
+               std::unique_ptr<EntityExpr> entity)
+      : location(location), name(name), entity(std::move(entity)) {}
+
+  virtual ~InstanceDecl() = default;
+
+  const Location &loc() { return location; }
+  llvm::StringRef getName() { return name; }
+  EntityExpr *getEntity() { return entity.get(); }
+
+private:
+  Location location;
+  std::string name;
+  std::unique_ptr<EntityExpr> entity;
+};
+
+class NLNetwork : Entity {
+public:
+  NLNetwork(Location location, std::string name,
+            std::vector<std::unique_ptr<Annotation>> annotations,
+            std::vector<std::unique_ptr<PortDecl>> inputPorts,
+            std::vector<std::unique_ptr<PortDecl>> outputPorts,
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters,
+            std::vector<std::unique_ptr<TypeDecl>> typeDecls,
+            std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
+            std::vector<std::unique_ptr<InstanceDecl>> entities,
+            std::vector<std::unique_ptr<StructureStmt>> structure)
+      : Entity(Entity_Network, location, name, std::move(annotations),
+               std::move(inputPorts), std::move(outputPorts),
+               std::move(typeParameters), std::move(valueParameters)),
+        typeDecls(std::move(typeDecls)), varDecls(std::move(varDecls)),
+        entities(std::move(entities)), structure(std::move(structure)) {}
+
+  llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecls() { return typeDecls; }
+
+  llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
+    return varDecls;
+  }
+
+  llvm::ArrayRef<std::unique_ptr<InstanceDecl>> getEntities() {
+    return entities;
+  }
+
+  llvm::ArrayRef<std::unique_ptr<StructureStmt>> getStructure() {
+    return structure;
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const Entity *c) {
+    return c->getKind() == Entity_Network;
+  }
+
+private:
   std::vector<std::unique_ptr<TypeDecl>> typeDecls;
   std::vector<std::unique_ptr<LocalVarDecl>> varDecls;
-  std::vector<std::unique_ptr<Expression>> guards;
-  std::vector<std::unique_ptr<Statement>> body;
-  std::unique_ptr<Expression> delay;
+  std::vector<std::unique_ptr<InstanceDecl>> entities;
+  std::vector<std::unique_ptr<StructureStmt>> structure;
 };
 
 } // namespace cal
