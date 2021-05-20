@@ -1,4 +1,11 @@
 
+FIND_PACKAGE(FLEX)
+FIND_PACKAGE(BISON)
+
+BISON_TARGET(Parser ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp COMPILE_FLAGS --report=solved COMPILE_FLAGS --feature=fixit)
+FLEX_TARGET(Scanner ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/tokens.l ${CMAKE_CURRENT_BINARY_DIR}/tokens.cpp )
+ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
@@ -7,9 +14,15 @@ set(LIBS
         MLIROptLib
         MLIRStreamBlocks
         )
-add_llvm_executable(streamblocks-parser streamblocks-parser.cpp)
+
+set(SOURCES
+        streamblocks-parser.cpp
+)
+
+add_llvm_executable(streamblocks-parser ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
 
 llvm_update_compile_flags(streamblocks-parser)
 target_link_libraries(streamblocks-parser PRIVATE ${LIBS})
+target_include_directories(streamblocks-parser PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 mlir_check_all_link_libraries(streamblocks-opt)

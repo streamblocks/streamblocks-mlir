@@ -26,6 +26,16 @@
 
 #include "QID.h"
 
+struct Location {
+  int first_line{0};
+  int first_column{0};
+  int last_line{0};
+  int last_column{0};
+  std::string file_name;
+};
+
+typedef Location YYLTYPE;
+
 namespace cal {
 
 class Expression;
@@ -34,14 +44,6 @@ class GeneratorVarDecl;
 class Decl;
 class Pattern;
 class Entity;
-
-struct Location {
-  int from_line{0};
-  int from_column{0};
-  int to_line{0};
-  int to_column{0};
-  std::string file_name;
-};
 
 class AnnotationParameter {
 public:
