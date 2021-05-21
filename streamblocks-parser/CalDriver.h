@@ -52,6 +52,9 @@ public:
     return;
   }
 
+  /// stream name (file or input stream) used for error messages.
+  std::string streamname;
+
 private:
   void parse_helper(std::istream &stream) {
     delete (scanner);
@@ -84,8 +87,7 @@ private:
   cal::CalParser *parser = nullptr;
   cal::CalScanner *scanner = nullptr;
 
-  /// stream name (file or input stream) used for error messages.
-  std::string streamname;
+
 
   const std::string red = "\033[1;31m";
   const std::string blue = "\033[1;36m";
