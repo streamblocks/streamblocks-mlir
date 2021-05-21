@@ -34,7 +34,6 @@ struct Location {
   std::string file_name;
 };
 
-typedef Location YYLTYPE;
 
 namespace cal {
 
