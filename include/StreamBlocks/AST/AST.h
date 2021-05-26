@@ -2297,8 +2297,9 @@ public:
         varDecls(std::move(varDecls)), entityDecls(std::move(entityDecls)),
         typeDecl(std::move(typeDecl)) {}
 
-private:
   virtual ~NamespaceDecl() = default;
+
+private:
 
   const Location &loc() { return location; }
   QID *getQID() { return qid.get(); }

@@ -15,13 +15,12 @@ public:
   QID(std::vector<std::string> parts) : parts(std::move(parts)) {}
   virtual ~QID() {}
 
-
-  QID *concat(QID &qid){
+  std::unique_ptr<QID> concat(QID &qid) {
     std::vector<std::string> elements = parts;
-    for(auto i : qid.parts){
+    for (auto i : qid.parts) {
       elements.push_back(i);
     }
-    return new QID(elements);
+    return std::make_unique<QID>(elements);
   }
 
   /**
@@ -36,16 +35,28 @@ public:
    *
    * @return the first name of this QID or null if this QID is empty
    */
-  QID *getFirst() { return part(0, 1); }
+  std::unique_ptr<QID> getFirst() { return part(0, 1); }
 
   /**
    * Returns a QID consisting of the last name of this QID.
    *
    * @return the last name of this QID or null if this QID is empty
    */
-  QID *getLast() {
+  std::unique_ptr<QID> getLast() {
     int count = getNameCount();
     return part(count - 1, count);
+  }
+
+  /**
+   * Returns a QID consisting of the sequence of names in this QID except the
+   * last name.
+   *
+   * @return the sequence of names except the last name in this QID or null if
+   *         this QID is empty
+   */
+  std::unique_ptr<QID> getButLast() {
+    int count = getNameCount();
+    return part(0, count - 1);
   }
 
   /**
@@ -57,7 +68,7 @@ public:
    * @return a QID from the given name
    *
    */
-  static QID *parse(std::string name) {
+  static std::unique_ptr<QID> parse(std::string name) {
     if (name.empty()) {
       return empty();
     }
@@ -69,7 +80,7 @@ public:
         parts.push_back(item);
       }
     }
-    return new QID(parts);
+    return std::make_unique<QID>(parts);
   }
 
   /**
@@ -77,7 +88,9 @@ public:
    *
    * @return an empty QID
    */
-  static QID *empty() { return new QID(std::vector<std::string>()); }
+  static std::unique_ptr<QID> empty() {
+    return std::make_unique<QID>(std::vector<std::string>());
+  }
 
   /**
    * Returns true if the first names of the given QID are equal to the names
@@ -101,16 +114,22 @@ public:
     }
   }
 
+  bool operator == (const QID& that)
+  {
+    bool result = std::equal(parts.begin(), parts.end(), that.parts.begin());
+    return result;
+  }
+
 private:
-  QID *part(int from, int to) {
+  std::unique_ptr<QID> part(int from, int to) {
     int count = getNameCount();
 
     if (from < 0 || from > count || to < from || to > count) {
       return nullptr;
     } else {
       auto first = parts.begin() + from;
-      auto last = parts.begin() + to + 1;
-      return new QID(std::vector<std::string>(first, last));
+      auto last = parts.begin() + to;
+      return std::make_unique<QID>(std::vector<std::string>(first, last));
     }
   }
 

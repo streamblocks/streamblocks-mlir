@@ -7,7 +7,8 @@
 int main(const int argc, const char **argv) {
   /** check for the right # of arguments **/
   if (argc == 2) {
-    cal::CalDriver driver;
+    cal::CalContext context;
+    cal::CalDriver driver(context);
     /** example for piping input from terminal, i.e., using cat **/
     if (std::strncmp(argv[1], "-o", 2) == 0) {
       driver.parse(std::cin);

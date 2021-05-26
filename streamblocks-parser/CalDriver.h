@@ -13,11 +13,14 @@
 #include "CalScanner.h"
 #include "cal_parser.hpp"
 
+#include "CalContext.h"
+
 namespace cal {
 
 class CalDriver {
 public:
-  CalDriver() = default;
+  CalDriver(CalContext &context)
+      : context(context),  trace_scanning(false), trace_parsing(false) {}
 
   virtual ~CalDriver() {
     delete (scanner);
@@ -56,6 +59,18 @@ public:
   std::string streamname;
 
 private:
+  CalContext &context;
+
+  CalParser *parser = nullptr;
+  CalScanner *scanner = nullptr;
+
+  /// enable debug output in the flex scanner
+  bool trace_scanning;
+
+  /// enable debug output in the bison parser
+  bool trace_parsing;
+
+
   void parse_helper(std::istream &stream) {
     delete (scanner);
     // try {
@@ -84,14 +99,6 @@ private:
     return;
   }
 
-  cal::CalParser *parser = nullptr;
-  cal::CalScanner *scanner = nullptr;
-
-
-
-  const std::string red = "\033[1;31m";
-  const std::string blue = "\033[1;36m";
-  const std::string norm = "\033[0m";
 };
 
 } // namespace cal
