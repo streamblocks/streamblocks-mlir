@@ -3,7 +3,7 @@ FIND_PACKAGE(FLEX)
 FIND_PACKAGE(BISON)
 
 BISON_TARGET(Parser ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/parser.yy  ${CMAKE_CURRENT_BINARY_DIR}/cal_parser.cpp)
-FLEX_TARGET(Scanner ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/tokens.l ${CMAKE_CURRENT_BINARY_DIR}/cal_lexer.yy.cpp)
+FLEX_TARGET(Scanner ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/tokens.ll ${CMAKE_CURRENT_BINARY_DIR}/cal_lexer.yy.cpp)
 ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
 
 

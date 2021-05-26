@@ -24,15 +24,10 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
+#include "location.hh"
 #include "QID.h"
 
-struct Location {
-  int first_line{0};
-  int first_column{0};
-  int last_line{0};
-  int last_column{0};
-  std::string file_name;
-};
+using Location = cal::location;
 
 
 namespace cal {
@@ -2300,7 +2295,6 @@ public:
   virtual ~NamespaceDecl() = default;
 
 private:
-
   const Location &loc() { return location; }
   QID *getQID() { return qid.get(); }
 
