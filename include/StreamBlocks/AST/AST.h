@@ -24,10 +24,17 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
-#include "location.hh"
+
 #include "QID.h"
 
-using Location = cal::location;
+struct Location {
+  int first_line{0};
+  int first_column{0};
+  int last_line{0};
+  int last_column{0};
+  //std::string file_name;
+};
+
 
 
 namespace cal {
@@ -230,9 +237,9 @@ private:
 };
 
 enum Availability {
-  Availability_PUBLIC,
-  Availability_PRIVATE,
-  Availability_LOCAL
+  PUBLIC,
+  PRIVATE,
+  LOCAL
 };
 
 class GlobalDecl {

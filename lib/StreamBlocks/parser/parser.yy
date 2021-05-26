@@ -1,8 +1,9 @@
 %skeleton "lalr1.cc"
-%require  "3.0"
+%require  "3.2"
 %debug
 %defines 
 %define api.namespace {cal}
+
 /**
  * bison 3.3.2 change
  * %define parser_class_name to this, updated
@@ -11,10 +12,16 @@
  */
 %define api.parser.class {CalParser}
 
+%code top {
+#include <memory>
+}
+
 %code requires{
+   #include <memory>
    namespace cal {
       class CalDriver;
       class CalScanner;
+      class QID;
    }
 
 // The following definitions is missing when %locations isn't used
@@ -34,11 +41,16 @@
 /* verbose error messages */
 %define parse.error verbose
 
+
+
 %code{
    #include <iostream>
    #include <cstdlib>
    #include <fstream>
-   
+   #include <memory>
+
+   #include "StreamBlocks/AST/AST.h"
+
    /* include for all driver functions */
    #include "CalDriver.h"
 
@@ -47,6 +59,8 @@
 }
 
 %define api.value.type variant
+/*%define api.token.constructor*/
+
 %locations
 %initial-action
 {
@@ -55,6 +69,8 @@
 };
 
 %start compilation_unit
+
+
 
 // Identifier
 %token ID
@@ -180,14 +196,23 @@
 %token  VBAR
 %token  CINNAMON_BUN
 
+
+
 %%
 
 
 compilation_unit: /* empty */
                  namespace_decl
                 ;
+simple_qid: ID
+          ;
 
-namespace_decl: NAMESPACE ID COLON END
+
+qid : simple_qid
+    | qid DOT simple_qid
+    ;
+
+namespace_decl: NAMESPACE qid COLON END
               ;
 
 %%

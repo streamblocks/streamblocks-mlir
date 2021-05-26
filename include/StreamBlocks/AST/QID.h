@@ -15,9 +15,9 @@ public:
   QID(std::vector<std::string> parts) : parts(std::move(parts)) {}
   virtual ~QID() {}
 
-  std::unique_ptr<QID> concat(QID &qid) {
+  std::unique_ptr<QID> concat(std::unique_ptr<QID> qid) {
     std::vector<std::string> elements = parts;
-    for (auto i : qid.parts) {
+    for (auto i : qid.get()->parts) {
       elements.push_back(i);
     }
     return std::make_unique<QID>(elements);
@@ -114,8 +114,13 @@ public:
     }
   }
 
-  bool operator == (const QID& that)
-  {
+  static std::unique_ptr<QID> of(std::string part) {
+    std::vector<std::string> parts;
+    parts.push_back(part);
+    return std::make_unique<QID>(parts);
+  }
+
+  bool operator==(const QID &that) {
     bool result = std::equal(parts.begin(), parts.end(), that.parts.begin());
     return result;
   }

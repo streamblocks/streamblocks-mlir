@@ -1,0 +1,379 @@
+
+options {
+	STATIC = false;
+	CHOICE_AMBIGUITY_CHECK = 3;
+	FORCE_LA_CHECK = false;
+	OUTPUT_LANGUAGE = "c++";
+    NAMESPACE = "cal::parser";
+    PARSER_INCLUDE = "inc.h";
+	DEBUG_PARSER = false;
+	DEBUG_TOKEN_MANAGER = false;
+	UNICODE_INPUT = true;
+}
+
+
+PARSER_BEGIN(CalParser)
+
+PARSER_END(CalParser)
+
+/* Whitespace */
+SKIP :
+{
+	" " | "\t" | "\n" | "\r" | "\f"
+}
+
+
+/* Comments */
+MORE :
+{
+  < "//" (~["\n", "\r"])* >
+|
+  < "/" ("*")+ "*/" >
+|
+  < "/" "*" (<OP>)* > : IN_MULTI_LINE_COMMENT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+  <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT,IN_SINGLE_LINE_COMMENT>
+MORE :
+{
+  < ~[] >
+}
+
+
+/* Keywords */
+TOKEN :
+{
+	< ACTION: "action" >
+|	< ACTOR: "actor" >
+|	< ALIAS: "alias" >
+|	< ALL: "all" >
+|	< AND: "and" >
+|	< AS: "as" >
+//|	< ANY: "any" >
+//|	< AT: "at" >
+//|	< AT_STAR: "at*" >
+|	< BEGIN: "begin" >
+//|	< CHOOSE: "choose" >
+|	< CASE: "case" >
+|	< CONST: "const" >
+//|	< DELAY: "delay" >
+|	< DIV: "div" >
+|	< DO: "do" >
+|	< DOM: "dom" >
+|	< ELSE: "else" >
+|	< ELSIF: "elsif" >
+|	< END: "end" >
+|	< ENDACTION: "endaction" >
+|	< ENDACTOR: "endactor" >
+|	< ENDCASE: "endcase" >
+|	< ENDCHOOSE: "endchoose" >
+|	< ENDFOREACH: "endforeach" >
+|	< ENDFUNCTION: "endfunction" >
+|	< ENDIF: "endif" >
+|	< ENDINITIALIZE: "endinitialize" >
+|	< ENDINVARIANT: "endinvariant" >
+|	< ENDLAMBDA: "endlambda" >
+|	< ENDLET: "endlet" >
+|	< ENDPRIORITY: "endpriority" >
+|	< ENDPROC: "endproc" >
+|	< ENDPROCEDURE: "endprocedure" >
+|	< ENDSCHEDULE: "endschedule" >
+|	< ENDWHILE: "endwhile" >
+|	< ENTITY: "entity" >
+|	< FALSE: "false" >
+|	< FOR: "for" >
+|	< FOREACH: "foreach" >
+|	< FSM: "fsm" >
+|	< FUNCTION: "function" >
+|	< GUARD: "guard" >
+|	< IF: "if" >
+|	< IMPORT: "import" >
+|	< IN: "in" >
+|	< INITIALIZE: "initialize" >
+|   < INVARIANT: "invariant" >
+|	< LAMBDA: "lambda" >
+|	< LET: "let" >
+|	< MAP: "map" >
+|	< MOD: "mod" >
+|	< MULTI: "multi" >
+|	< MUTABLE: "mutable" >
+|	< NAMESPACE: "namespace" >
+|	< NOT: "not" >
+|	< NULL_: "null" >
+|	< OLD: "old" >
+|	< OF: "of" >
+|	< OR: "or" >
+|	< PRIORITY: "priority" >
+|	< PROC: "proc" >
+|	< PROCEDURE: "procedure" >
+|	< REGEXP: "regexp" >
+|	< REPEAT: "repeat" >
+|	< RNG: "rng" >
+|	< SCHEDULE: "schedule" >
+|	< THEN: "then" >
+//|	< TIME: "time" >
+|	< TRUE: "true" >
+|	< TYPE: "type" >
+|	< VAR: "var" >
+|	< WHILE: "while" >
+
+|	< PUBLIC: "public" >
+|	< PRIVATE: "private" >
+|	< LOCAL: "local" >
+
+|	< NETWORK: "network" >
+|	< ENTITIES: "entities" >
+|	< STRUCTURE: "structure" >
+|	< EXTERNAL: "external" >
+}
+
+/* Delimiters and separators */
+TOKEN: {
+	< COLON: ":" >
+|	< DOT: "." >
+|	< COMMA: "," >
+|	< LONG_DOUBLE_ARROW_RITHT: "==>" >
+|	< LONG_SINGLE_ARROW_RIGHT: "-->" >
+|	< LONG_SINGLE_ARROW_LEFT: "<--" >
+|	< LPAREN: "(" >
+|	< RPAREN: ")" >
+|	< LCURLY: "{" >
+|	< RCURLY: "}" >
+|	< LSQUARE: "[" >
+|	< RSQUARE: "]" >
+}
+
+/* Operators */
+TOKEN: {
+	< EQ: "=" >
+|	< COLON_EQ: ":=" >
+|	< SINGLE_ARROW_RIGHT: "->" >
+|	< VERTICAL_BAR: "|" >
+|	< GREATER_THAN: ">" >
+|	< SHARP: "#" >
+|	< DOT_SHARP: ".#" >
+|	< STAR: "*" >
+|	< DOT_STAR: ".*" >
+|	< CINNAMON_BUN: "@" >
+|	< OP: <OP_CHAR> (<OP_CHAR> | "=")* >
+|	< #OP_CHAR: ["!", "#", "$", "%", "^", "&", "*", "/",
+		"+", "-", "<", ">", "?", "~", "|", "."] >
+}
+
+/* String literals */
+TOKEN: {
+	< CHARACTER_LITERAL:
+          "'"
+          (   (~["'","\\","\n","\r"])
+            | ("\\"
+                ( ["n","t","b","r","f","\\","'","\""]
+                | ["0"-"7"] ( ["0"-"7"] )?
+                | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+                )
+              )
+          )
+          "'"
+      >
+    |
+      < STRING_LITERAL:
+          "\""
+          (   (~["\"","\\","\n","\r"])
+            | ("\\"
+                ( ["n","t","b","r","f","\\","'","\""]
+                | ["0"-"7"] ( ["0"-"7"] )?
+                | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+                )
+              )
+          )*
+          "\""
+      >
+}
+
+
+/* Numeric literals */
+TOKEN: {
+	< INTEGER: <DECIMAL_LITERAL> | <HEXADECIMAL_LITERAL> | <OCTAL_LITERAL> | <BINARY_LITERAL> >
+|
+	<REAL:
+			(<DECIMAL_DIGIT>)+ "." (<DECIMAL_DIGIT>)+ (<EXPONENT>)?
+		|	(<DECIMAL_DIGIT>)+ "." <EXPONENT> >
+//|
+//	< REAL:
+//			(<DECIMAL_DIGIT>)+ "." (<DECIMAL_DIGIT>)* (<EXPONENT>)?
+//		|	"." (<DECIMAL_DIGIT>)+ (<EXPONENT>)?
+//		|	(<DECIMAL_DIGIT>)+ <EXPONENT> >
+|
+	< #DECIMAL_LITERAL: <NON_ZERO_DECIMAL_DIGIT> (<DECIMAL_DIGIT>)* >
+|
+	< #HEXADECIMAL_LITERAL: "0" ["x", "X"] (<HEXADECIMAL_DIGIT>)+ >
+|
+	< #OCTAL_LITERAL: "0" (<OCTAL_DIGIT>)* >
+|
+	< #BINARY_LITERAL: "0" ["b", "B"] (<BINARY_DIGIT>)+ >
+|
+	< #EXPONENT: ["e", "E"] (["+", "-"])? (<DECIMAL_DIGIT>)+ >
+|
+	< #NON_ZERO_DECIMAL_DIGIT: ["1"-"9"] >
+|
+	< #DECIMAL_DIGIT: ["0"-"9"] >
+|
+	< #OCTAL_DIGIT: ["0"-"7"] >
+|
+    < #BINARY_DIGIT: ["0"-"1"] >
+|
+	< #HEXADECIMAL_DIGIT: ["0"-"9", "a"-"f", "A"-"F"] >
+}
+
+
+/* Identifies */
+TOKEN: {
+	< ID: (["a"-"z", "A"-"Z", "_", "$", "0"-"9"])+ >
+}
+
+std::unique_ptr<cal::NamespaceDecl> CompilationUnit() :
+{
+	std::unique_ptr<cal::NamespaceDecl> ns;
+}
+{
+
+	ns = NamespaceDecl()
+	<EOF>
+	{
+		return ns;
+	}
+}
+
+std::unique_ptr<cal::NamespaceDecl> NamespaceDecl() :
+{
+	std::unique_ptr<cal::QID> qid;
+	std::unique_ptr<cal::NamespaceDecl> ns;
+	int beginLine;
+	int beginColumn;
+	int endLine;
+	int endColumn;
+}
+{
+	"namespace"
+	{
+	    beginLine = token->beginLine;
+	    beginColumn = token->beginColumn;
+	    endLine = token->endLine;
+	    endColumn = token->endColumn;
+	}
+	qid = QID()
+	":"
+
+	"end"
+	{
+        Location loc = {beginLine, beginColumn, endLine, endColumn};
+        //ns.setPosition(beginLine, beginColumn, endLine, endColumn);
+        return ns;
+    }
+}
+
+std::unique_ptr<cal::QID> QID() :
+{
+	std::unique_ptr<cal::QID> qid;
+	Token *id;
+	int beginLine;
+    int beginColumn;
+}
+{
+	id = <ID> {
+                 beginLine = id->beginLine;
+                 beginColumn = id->beginColumn;
+                 qid = cal::QID::of(id->image);
+                }
+	(
+		LOOKAHEAD(2)
+		"."
+		id = <ID> { qid = qid.get()->concat(std::move(cal::QID::of(id->image))); }
+	)*
+	{
+
+        return qid;
+    }
+}
+
+std::unique_ptr<cal::NamespaceDecl> NamespaceDeclContents(std::unique_ptr<cal::QID> name) :
+{
+	std::vector<std::unique_ptr<cal::Import>> imports;
+
+
+	std::unique_ptr<cal::Import> i;
+
+	std::unique_ptr<cal::NamespaceDecl> ns;
+
+}
+{
+	(
+		i = Import() ";" { imports.push_back(i); }
+
+	)*
+	{
+		return ns;
+	}
+}
+
+
+/* Declarations */
+cal::Availability Availability() :
+{
+}
+{
+	"public" { return Availability::PUBLIC; }
+|
+	"private" { return Availability::PRIVATE; }
+|
+	"local" { return Availability::LOCAL; }
+}
+
+
+/* Imports */
+std::unique_ptr<cal::Import> Import() :
+{
+	std::unique_ptr<cal::Import> imp;
+}
+{
+	"import"
+
+		imp = GroupImportTail()
+
+
+	{
+		return imp;
+	}
+}
+
+std::unique_ptr<cal::Import> GroupImportTail() :
+{
+	std::unique_ptr<cal::QID> globalName;
+	cal::Import::Prefix kind = Import::Prefix::VAR;
+}
+{
+	"all"
+	(kind = ImportKind())?
+	globalName = QID()
+	{
+		Location loc;
+		return std::make_unique<cal::GroupImport>(loc, kind, std::move(globalName));
+	}
+}
+
+
+
+cal::Import::Prefix ImportKind() :
+{}
+{
+	"var" { return Import::Prefix::VAR; }
+|
+	"type" { return Import::Prefix::TYPE; }
+|
+	"entity" { return Import::Prefix::ENTITY; }
+}
