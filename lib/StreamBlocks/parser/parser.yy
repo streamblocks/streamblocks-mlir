@@ -1,234 +1,255 @@
-%skeleton "lalr1.cc"
-%require  "3.2"
-%debug
-%defines 
+%skeleton "lalr1.cc" /* -*- C++ -*- */
+%require "3.5.1"
+%defines
+
 %define api.namespace {cal}
-
-/**
- * bison 3.3.2 change
- * %define parser_class_name to this, updated
- * should work for previous bison versions as 
- * well. -jcb 24 Jan 2020
- */
 %define api.parser.class {CalParser}
-
-%code top {
-#include <memory>
-}
-
-%code requires{
-   #include <memory>
-   #include <string>
-   #include <vector>
-
-   #include "StreamBlocks/AST/AST.h"
-
-   namespace cal {
-      class CalDriver;
-      class CalScanner;
-      class QID;
-   }
-
-// The following definitions is missing when %locations isn't used
-# ifndef YY_NULLPTR
-#  if defined __cplusplus && 201103L <= __cplusplus
-#   define YY_NULLPTR nullptr
-#  else
-#   define YY_NULLPTR 0
-#  endif
-# endif
-
-}
-
-%parse-param { CalScanner  &scanner  }
-%parse-param { CalDriver  &driver  }
-
-/* verbose error messages */
-%define parse.error verbose
-
-
-
-%code{
-   #include <iostream>
-   #include <cstdlib>
-   #include <fstream>
-   #include <memory>
-
-
-
-   /* include for all driver functions */
-   #include "CalDriver.h"
-
-#undef yylex
-#define yylex scanner.yylex
-}
-
-%define api.value.type variant
+%define api.token.constructor
 %define api.value.automove
-/*%define api.token.constructor*/
+%define api.value.type variant
+
+
+%code requires {
+     #include <memory>
+     #include <string>
+     #include <vector>
+
+     #include "StreamBlocks/AST/AST.h"
+
+     namespace cal {
+        class QID;
+     }
+
+  // The following definitions is missing when %locations isn't used
+  # ifndef YY_NULLPTR
+  #  if defined __cplusplus && 201103L <= __cplusplus
+  #   define YY_NULLPTR nullptr
+  #  else
+  #   define YY_NULLPTR 0
+  #  endif
+  # endif
+
+
+  class driver;
+}
+
+// The parsing context.
+%param { driver& drv }
 
 %locations
-%initial-action
-{
-    // initialize the initial location object
-    @$.begin.filename = @$.end.filename = &driver.streamname;
-};
 
-%start compilation_unit
+%define parse.trace
+%define parse.error verbose
 
+%code {
+# include "driver.h"
+}
 
+%define api.token.prefix {TOK_}
+%token
+    EOF  0  "end of file"
+    /* -- Keywords --*/
+    ACTION "action"
+    ACTOR "actor"
+    ALIAS "alias"
+    ALL "all"
+    AND "and"
+    ANY "any"
+    AS "as"
+    ASSIGN "assign"
+    AT "at"
+    AT_STAR "at*"
+    BEGIN_ "begin"
+    CASE "case"
+    CHOOSE "choose"
+    CONST "const"
+    DEFAULT "default"
+    DELAY "delay"
+    DIV  "div"
+    DO "do"
+    DOM "dom"
+    ELSE "else"
+    ELSIF "elsif"
+    END "end"
+    ENDACTION "endaction"
+    ENDASSIGN "endassign"
+    ENDACTOR "endactor"
+    ENDCASE "endcase"
+    ENDBEGIN "endbegin"
+    ENDCHOOSE "endchoose"
+    ENDFOREACH "endforeach"
+    ENDFUNCTION "endfunction"
+    ENDIF "endif"
+    ENDINITIALIZE "endinitialize"
+    ENDINVARIANT "endinvariant"
+    ENDLAMBDA "endlambda"
+    ENDLET "endlet"
+    ENDPRIORITY "endpriority"
+    ENDPROC "endproc"
+    ENDPROCEDURE "endprocedure"
+    ENDSCHEDULE "endschedule"
+    ENDWHILE "endwhile"
+    ENTITY "entity"
+    ENSURE "ensure"
+    FALSE "false"
+    FOR "for"
+    FOREACH "foreach"
+    FSM  "fsm"
+    FUNCTION "function"
+    GUARD "guard"
+    IF "if"
+    IMPORT "import"
+    IN "in"
+    INITIALIZE "initialize"
+    INVARIANT "invariant"
+    LAMBDA "lambda"
+    LET "let"
+    MAP "map"
+    MOD "mod"
+    MULTI "multi"
+    MUTABLE "mutable"
+    NAMESPACE "namespace"
+    NOT "not"
+    NULL "null"
+    OLD "old"
+    OF "of"
+    OR "or"
+    PRIORITY "priority"
+    PROC "proc"
+    PACKAGE "package"
+    PROCEDURE "procedure"
+    REGEXP "regexp"
+    REPEAT "repeat"
+    REQUIRE "require"
+    RNG "rng"
+    SCHEDULE "schedule"
+    TIME "time"
+    THEN "then"
+    TRUE "true"
+    TO "to"
+    TYPE "type"
+    VAR "var"
+    WHILE "while"
+    PUBLIC "public"
+    PRIVATE "private"
+    LOCAL "local"
+    NETWORK "network"
+    ENTITIES "entities"
+    STRUCTURE "structure"
+    EXTERNAL "external"
 
-// Identifier
+    /* -- Delimiters --*/
+    COLON ":"
+    COLON_EQUALS ":="
+    COMMA ","
+    DASH_DASH_GT "-->"
+    DASH_GT "->"
+    DOT "."
+    DOT_DOT ".."
+    EQUALS "="
+    EQUALS_EQUALS_GT "==>"
+    HASH "#"
+    LBRACE "{"
+    LBRACK "["
+    LPAR "("
+    LT "<"
+    GT ">"
+    PLUS "+"
+    QMARK "?"
+    RBRACE "}"
+    RBRACK "]"
+    RPAR ")"
+    SEMI ";"
+    STAR "*"
+    UNDER_SCORE "_"
+    VBAR "|"
+    CINNAMON_BUN "@"
+;
+
 %token <std::string> ID
-%token STRING
-%token INTEGER
-%token REAL
+%token <int> NUMBER
 
-// Keywords
-%token  ACTION "action"
-%token  ACTOR "actor"
-%token  ALIAS "alias"
-%token  ALL "all"
-%token  AND "and"
-%token  ANY "any"
-%token  AS "as"
-%token  ASSIGN "assign"
-%token  AT "at"
-%token  AT_STAR "at*"
-%token  BEGIN_ "begin"
-%token  CASE "case"
-%token  CHOOSE "choose"
-%token  CONST "const"
-%token  DEFAULT "default"
-%token  DELAY "delay"
-%token  DIV  "div"
-%token  DO "do"
-%token  DOM "dom"
-%token  ELSE "else"
-%token  ELSIF "elsif"
-%token  END "end"
-%token  ENDACTION "endaction"
-%token  ENDASSIGN "endassign"
-%token  ENDACTOR "endactor"
-%token  ENDCASE "endcase"
-%token  ENDBEGIN "endbegin"
-%token  ENDCHOOSE "endchoose"
-%token  ENDFOREACH "endforeach"
-%token  ENDFUNCTION "endfunction"
-%token  ENDIF "endif"
-%token  ENDINITIALIZE "endinitialize"
-%token  ENDINVARIANT "endinvariant"
-%token  ENDLAMBDA "endlambda"
-%token  ENDLET "endlet"
-%token  ENDPRIORITY "endpriority"
-%token  ENDPROC "endproc"
-%token  ENDPROCEDURE "endprocedure"
-%token  ENDSCHEDULE "endschedule"
-%token  ENDWHILE "endwhile"
-%token  ENTITY "entity"
-%token  ENSURE "ensure"
-%token  FALSE "false"
-%token  FOR "for"
-%token  FOREACH "foreach"
-%token  FSM  "fsm"
-%token  FUNCTION "function"
-%token  GUARD "guard"
-%token  IF "if"
-%token  IMPORT "import"
-%token  IN "in"
-%token  INITIALIZE "initialize"
-%token  INVARIANT "invariant"
-%token  LAMBDA "lambda"
-%token  LET "let"
-%token  MAP "map"
-%token  MOD "mod"
-%token  MULTI "multi"
-%token  MUTABLE "mutable"
-%token  NAMESPACE "namespace"
-%token  NOT "not"
-%token  NULL_ "null"
-%token  OLD "old"
-%token  OF "of"
-%token  OR "or"
-%token  PRIORITY "priority"
-%token  PROC "proc"
-%token  PACKAGE "package"
-%token  PROCEDURE "procedure"
-%token  REGEXP "regexp"
-%token  REPEAT "repeat"
-%token  REQUIRE "require"
-%token  RNG "rng"
-%token  SCHEDULE "schedule"
-%token  TIME "time"
-%token  THEN "then"
-%token  TRUE "true"
-%token  TO "to"
-%token  TYPE "type"
-%token  VAR "var"
-%token  WHILE "while"
-%token  PUBLIC "public"
-%token  PRIVATE "private"
-%token  LOCAL "local"
-%token  NETWORK "network"
-%token  ENTITIES "entities"
-%token  STRUCTURE "structure"
-%token  EXTERNAL "external"
 
-// Delimiters, separators, operators 
-
-%token  COLON
-%token  COLON_EQUALS
-%token  COMMA
-%token  DASH_DASH_GT
-%token  DASH_GT
-%token  DOT
-%token  DOT_DOT
-%token  EQUALS
-%token  EQUALS_EQUALS_GT
-%token  HASH
-%token  LBRACE
-%token  LBRACK
-%token  LPAR
-%token  LT
-%token  GT
-%token  PLUS
-%token  QMARK
-%token  RBRACE
-%token  RBRACK
-%token  RPAR
-%token  SEMI
-%token  STAR
-%token  UNDER_SCORE
-%token  VBAR
-%token  CINNAMON_BUN
+/*%printer { yyo << $$; } <*>;*/
 
 %type <std::unique_ptr<cal::QID>> simple_qid qid
+%type <std::unique_ptr<cal::NamespaceDecl>> namespace_decl namespace_decl_default
+%type <cal::Import::Prefix> import_kind
+%type <std::unique_ptr<cal::Import>> import single_import group_import
+
+
 
 %%
+%start unit;
 
+unit: %empty
+    | namespace_decl_default
+    | namespace_decl
+    ;
 
-compilation_unit: /* empty */
-                | qid
-                ;
-simple_qid: ID
-            {
-                $$ = cal::QID::of($1);
-            }
+/* QID */
+
+simple_qid: ID { $$ = cal::QID::of($1); }
           ;
 
 qid : simple_qid
-    | qid DOT simple_qid
+    | qid "." simple_qid
     {
        $$ = $1;
        $$.get()->concat(std::move($3));
     }
     ;
 
+/* Namespace */
+
+namespace_decl:  "namespace" qid ":" imports "end"
+              ;
+
+namespace_decl_default : imports
+                       ;
+
+
+/* Imports */
+
+import_kind: "var" { $$ = cal::Import::Prefix::VAR;}
+           | "type" { $$ = cal::Import::Prefix::TYPE;}
+           | "entity" { $$ = cal::Import::Prefix::TYPE;}
+           ;
+
+single_import: import_kind qid "=" ID { $$ = std::make_unique<cal::SingleImport>(@$, $1, std::move($2), $4);}
+             | qid "=" ID { $$ = std::make_unique<cal::SingleImport>(@$, cal::Import::Prefix::VAR, std::move($1), $3);}
+             | import_kind qid {
+                                     std::unique_ptr<cal::QID> global = $2;
+                                     $$ = std::make_unique<cal::SingleImport>(@$, $1, std::move(global), global.get()->getLast().get()->toString());
+                                }
+             | qid {
+                        std::unique_ptr<cal::QID> global = $1;
+                        $$ = std::make_unique<cal::SingleImport>(@$, cal::Import::Prefix::VAR, std::move(global), global.get()->getLast().get()->toString());
+                   }
+
+group_import: "all" qid { $$ = std::make_unique<cal::GroupImport>(@$, cal::Import::Prefix::VAR, std::move($2)); }
+            | "all" import_kind qid { $$ = std::make_unique<cal::GroupImport>(@$, $2, std::move($3)); }
+            ;
+
+import: "import" single_import  ";" { $$ = $2; }
+      | "import" group_import   ";" { $$ = $2; }
+      ;
+
+%nterm <std::vector<std::unique_ptr<cal::Import>>> imports;
+imports: %empty {/* empty */}
+       | imports import { $$=$1; $$.push_back($2); }
+
+
+
+/* Expression */
+
+
+
 
 %%
 
 void
-cal::CalParser::error( const location_type &l, const std::string &err_message )
+cal::CalParser::error (const cal::CalParser::location_type& l, const std::string& m)
 {
-   std::cerr << "Error: " << err_message << " at " << l << "\n";
+  std::cerr << l << ": " << m << '\n';
 }

@@ -5,6 +5,7 @@
 #ifndef QID_H
 #define QID_H
 
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -112,6 +113,16 @@ public:
       }
       return true;
     }
+  }
+
+  std::string toString() {
+    std::string result =
+        std::accumulate(parts.begin(), parts.end(), std::string(),
+                        [](const std::string& a, const std::string& b) -> std::string {
+                          return a + (a.length() > 0 ? "." : "") + b;
+                        } );
+
+    return result;
   }
 
   static std::unique_ptr<QID> of(std::string part) {

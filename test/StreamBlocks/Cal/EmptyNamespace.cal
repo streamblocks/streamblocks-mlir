@@ -1,1 +1,9 @@
-test.test
+/*
+ffkfk
+
+*/
+
+namespace test:
+    import var test;
+    import var toto;
+end

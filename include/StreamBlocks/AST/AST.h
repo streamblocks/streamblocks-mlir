@@ -23,17 +23,11 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
-
+#include "location.hh"
 
 #include "QID.h"
 
-struct Location {
-  int first_line{0};
-  int first_column{0};
-  int last_line{0};
-  int last_column{0};
-  //std::string file_name;
-};
+using Location = cal::location;
 
 
 
@@ -788,11 +782,11 @@ private:
 
 class ExprBinary : public Expression {
 public:
-  char getOp() { return op; }
+  llvm::StringRef getOp() { return op; }
   Expression *getLHS() { return lhs.get(); }
   Expression *getRHS() { return rhs.get(); }
 
-  ExprBinary(Location loc, char op, std::unique_ptr<Expression> lhs,
+  ExprBinary(Location loc, std::string op, std::unique_ptr<Expression> lhs,
              std::unique_ptr<Expression> rhs)
       : Expression(Expr_Binary, loc), op(op), lhs(std::move(lhs)),
         rhs(std::move(rhs)) {}
@@ -803,7 +797,7 @@ public:
   }
 
 private:
-  char op;
+  std::string op;
   std::unique_ptr<Expression> lhs, rhs;
 };
 
@@ -1761,11 +1755,11 @@ private:
 
 class RegExpBinary : public RegExp {
 public:
-  char getOp() { return op; }
+  llvm::StringRef getOp() { return op; }
   RegExp *getLHS() { return lhs.get(); }
   RegExp *getRHS() { return rhs.get(); }
 
-  RegExpBinary(Location loc, char op, std::unique_ptr<RegExp> lhs,
+  RegExpBinary(Location loc, std::string op, std::unique_ptr<RegExp> lhs,
                std::unique_ptr<RegExp> rhs)
       : RegExp(RegExp_Binary, loc), op(op), lhs(std::move(lhs)),
         rhs(std::move(rhs)) {}
@@ -1774,7 +1768,7 @@ public:
   static bool classof(const RegExp *c) { return c->getKind() == RegExp_Binary; }
 
 private:
-  char op;
+  std::string op;
   std::unique_ptr<RegExp> lhs, rhs;
 };
 
