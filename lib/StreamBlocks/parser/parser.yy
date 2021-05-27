@@ -18,6 +18,11 @@
 
 %code requires{
    #include <memory>
+   #include <string>
+   #include <vector>
+
+   #include "StreamBlocks/AST/AST.h"
+
    namespace cal {
       class CalDriver;
       class CalScanner;
@@ -49,7 +54,7 @@
    #include <fstream>
    #include <memory>
 
-   #include "StreamBlocks/AST/AST.h"
+
 
    /* include for all driver functions */
    #include "CalDriver.h"
@@ -59,6 +64,7 @@
 }
 
 %define api.value.type variant
+%define api.value.automove
 /*%define api.token.constructor*/
 
 %locations
@@ -73,7 +79,7 @@
 
 
 // Identifier
-%token ID
+%token <std::string> ID
 %token STRING
 %token INTEGER
 %token REAL
@@ -196,24 +202,28 @@
 %token  VBAR
 %token  CINNAMON_BUN
 
-
+%type <std::unique_ptr<cal::QID>> simple_qid qid
 
 %%
 
 
 compilation_unit: /* empty */
-                 namespace_decl
+                | qid
                 ;
 simple_qid: ID
+            {
+                $$ = cal::QID::of($1);
+            }
           ;
-
 
 qid : simple_qid
     | qid DOT simple_qid
+    {
+       $$ = $1;
+       $$.get()->concat(std::move($3));
+    }
     ;
 
-namespace_decl: NAMESPACE qid COLON END
-              ;
 
 %%
 

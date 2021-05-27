@@ -20,10 +20,10 @@ set(SOURCES
         streamblocks-parser.cpp
         )
 
-add_llvm_executable(streamblocks-parser ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
+add_llvm_executable(streamblocks-parser-bison ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
 
-llvm_update_compile_flags(streamblocks-parser)
-target_link_libraries(streamblocks-parser PRIVATE ${LIBS})
-target_include_directories(streamblocks-parser PRIVATE ${CMAKE_CURRENT_BINARY_DIR} .)
+llvm_update_compile_flags(streamblocks-parser-bison)
+target_link_libraries(streamblocks-parser-bison PRIVATE ${LIBS})
+target_include_directories(streamblocks-parser-bison PRIVATE ${CMAKE_CURRENT_BINARY_DIR} .)
 
-mlir_check_all_link_libraries(streamblocks-opt)
+mlir_check_all_link_libraries(streamblocks-parser-bison)

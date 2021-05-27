@@ -167,7 +167,7 @@ private:
   Location location;
 };
 
-class TypeParameter : Parameter {
+class TypeParameter : public Parameter {
   TypeParameter(Location loc, std::string name, std::unique_ptr<TypeExpr> value)
       : Parameter(Param_Type, loc), name(name), value(std::move(value)) {}
 
@@ -182,7 +182,7 @@ private:
   std::unique_ptr<TypeExpr> value;
 };
 
-class ValueParameter : Parameter {
+class ValueParameter : public Parameter {
   ValueParameter(Location loc, std::string name,
                  std::unique_ptr<Expression> value)
       : Parameter(Param_Value, loc), name(name), value(std::move(value)) {}
@@ -247,7 +247,7 @@ public:
   virtual Availability getAvailability() = 0;
 };
 
-class TypeDecl : Decl {
+class TypeDecl : public Decl {
 public:
   TypeDecl(Location location, std::string name)
       : Decl(Decl_Type, location, name) {}
@@ -257,7 +257,7 @@ public:
   }
 };
 
-class GlobalTypeDecl : TypeDecl, GlobalDecl {
+class GlobalTypeDecl : public TypeDecl, GlobalDecl {
 public:
   GlobalTypeDecl(Location location, std::string name,
                  const Availability availability)
@@ -269,7 +269,7 @@ private:
   const Availability availability;
 };
 
-class AliasTypeDecl : GlobalTypeDecl {
+class AliasTypeDecl : public GlobalTypeDecl {
 public:
   AliasTypeDecl(Location location, std::string name, Availability availability,
                 std::unique_ptr<TypeExpr> type)
@@ -281,7 +281,7 @@ private:
   std::unique_ptr<TypeExpr> type;
 };
 
-class GlobalEntityDecl : Decl, GlobalDecl {
+class GlobalEntityDecl : public Decl, GlobalDecl {
 public:
   GlobalEntityDecl(Location location, std::string name,
                    std::unique_ptr<Entity> entity, Availability availability,
@@ -303,13 +303,13 @@ private:
   const bool external;
 };
 
-class ParameterTypeDecl : TypeDecl {
+class ParameterTypeDecl : public TypeDecl {
 public:
   ParameterTypeDecl(Location location, std::string name)
       : TypeDecl(location, name) {}
 };
 
-class VarDecl : Decl {
+class VarDecl : public Decl {
 public:
   VarDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
           std::unique_ptr<Expression> value, bool constant, bool external)
@@ -332,7 +332,7 @@ private:
   const bool external;
 };
 
-class FieldDecl : VarDecl {
+class FieldDecl : public VarDecl {
 public:
   FieldDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
             std::unique_ptr<Expression> value)
@@ -340,13 +340,13 @@ public:
                 false) {}
 };
 
-class GeneratorVarDecl : VarDecl {
+class GeneratorVarDecl : public VarDecl {
 public:
   GeneratorVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 };
 
-class GlobalVarDecl : VarDecl, GlobalDecl {
+class GlobalVarDecl : public VarDecl, GlobalDecl {
 public:
   GlobalVarDecl(Location location, std::string name,
                 std::unique_ptr<TypeExpr> type,
@@ -362,13 +362,13 @@ private:
   const Availability availability;
 };
 
-class InputVarDecl : VarDecl {
+class InputVarDecl : public VarDecl {
 public:
   InputVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 };
 
-class LocalVarDecl : VarDecl {
+class LocalVarDecl : public VarDecl {
 public:
   LocalVarDecl(Location location, std::string name,
                std::unique_ptr<TypeExpr> type,
@@ -377,7 +377,7 @@ public:
                 false) {}
 };
 
-class ParameterVarDecl : VarDecl {
+class ParameterVarDecl : public VarDecl {
 public:
   ParameterVarDecl(Location location, std::string name,
                    std::unique_ptr<TypeExpr> type,
@@ -386,12 +386,12 @@ public:
                 false) {}
 };
 
-class PatternVarDecl : VarDecl {
+class PatternVarDecl : public VarDecl {
   PatternVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 };
 
-class PortDecl : Decl {
+class PortDecl : public Decl {
 
 public:
   PortDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type)
@@ -407,7 +407,7 @@ private:
   std::unique_ptr<TypeExpr> type;
 };
 
-class VariantDecl : Decl {
+class VariantDecl : public Decl {
 public:
   VariantDecl(Location location, std::string name,
               std::vector<std::unique_ptr<FieldDecl>> fields)
@@ -430,7 +430,7 @@ public:
   getValueParameters() = 0;
 };
 
-class SumTypeDecl : GlobalTypeDecl, AlgebraicTypeDecl {
+class SumTypeDecl : public GlobalTypeDecl, AlgebraicTypeDecl {
 public:
   SumTypeDecl(Location location, std::string name, Availability availability,
               std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
@@ -460,7 +460,7 @@ private:
   std::vector<std::unique_ptr<VariantDecl>> variants;
 };
 
-class ProductTypeDecl : GlobalTypeDecl, AlgebraicTypeDecl {
+class ProductTypeDecl : public GlobalTypeDecl, AlgebraicTypeDecl {
 public:
   ProductTypeDecl(
       Location location, std::string name, Availability availability,
@@ -509,25 +509,26 @@ private:
   const Prefix prefix;
 };
 
-class SingleImport : Import {
+class SingleImport : public Import {
 public:
-  SingleImport(Location location, Prefix prefix, QID globalName,
+  SingleImport(Location location, Prefix prefix, std::unique_ptr<QID> globalName,
                std::string localName)
-      : Import(Import_Single, location, prefix), globalName(globalName),
+      : Import(Import_Single, location, prefix), globalName(std::move(globalName)),
         localName(localName) {}
 
 private:
-  const QID globalName;
+  std::unique_ptr<QID> globalName;
   std::string localName;
 };
 
-class GroupImport : Import {
+class GroupImport : public Import {
 public:
-  GroupImport(Location location, Prefix prefix, QID globalName)
-      : Import(Import_Group, location, prefix), globalName(globalName) {}
+  GroupImport(Location location, Prefix prefix,
+              std::unique_ptr<QID> globalName)
+      : Import(Import_Group, location, prefix), globalName(std::move(globalName)) {}
 
 private:
-  const QID globalName;
+  std::unique_ptr<QID> globalName;
 };
 
 /// Base class for all type TypeExpr nodes.
@@ -553,7 +554,7 @@ private:
   Location location;
 };
 
-class NominalTypeExpr : TypeExpr {
+class NominalTypeExpr : public TypeExpr {
 public:
   NominalTypeExpr(Location loc, std::string name,
                   std::vector<std::unique_ptr<TypeParameter>> parameterType,
@@ -581,7 +582,7 @@ private:
   std::vector<std::unique_ptr<ValueParameter>> parameterValue;
 };
 
-class FunctionTypeExpr : TypeExpr {
+class FunctionTypeExpr : public TypeExpr {
 public:
   FunctionTypeExpr(Location loc,
                    std::vector<std::unique_ptr<TypeExpr>> parameterTypes,
@@ -605,7 +606,7 @@ private:
   std::unique_ptr<TypeExpr> returnType;
 };
 
-class ProcedureTypeExpr : TypeExpr {
+class ProcedureTypeExpr : public TypeExpr {
 public:
   ProcedureTypeExpr(Location loc,
                     std::vector<std::unique_ptr<TypeExpr>> parameterTypes)
@@ -625,7 +626,7 @@ private:
   std::vector<std::unique_ptr<TypeExpr>> parameterTypes;
 };
 
-class TupleTypeExpr : TypeExpr {
+class TupleTypeExpr : public TypeExpr {
 public:
   TupleTypeExpr(Location loc, std::vector<std::unique_ptr<TypeExpr>> types)
       : TypeExpr(TypeExpr_Tuple, loc), types(std::move(types)) {}
@@ -641,7 +642,7 @@ private:
   std::vector<std::unique_ptr<TypeExpr>> types;
 };
 
-class UnionTypeExpr : TypeExpr {
+class UnionTypeExpr : public TypeExpr {
 public:
   UnionTypeExpr(TypeExprKind kind, Location location,
                 std::vector<std::unique_ptr<TypeExpr>> types)
@@ -909,7 +910,7 @@ private:
   std::unique_ptr<TypeExpr> type;
 };
 
-class ExprTypeConstruction : Expression {
+class ExprTypeConstruction : public Expression {
 public:
   ExprTypeConstruction(
       Location loc, std::string constructor,
@@ -942,7 +943,7 @@ private:
   std::vector<std::unique_ptr<Expression>> args;
 };
 
-class ExprCase : Expression {
+class ExprCase : public Expression {
 public:
   ExprCase(Location location, std::unique_ptr<Pattern> pattern,
            std::vector<std::unique_ptr<Expression>> guards,
@@ -984,7 +985,7 @@ private:
   Location location;
 };
 
-class LValueVariable : LValue {
+class LValueVariable : public LValue {
 public:
   LValueVariable(Location location, std::unique_ptr<Variable> variable)
       : LValue(LValue_Variable, location), variable(std::move(variable)) {}
@@ -1000,7 +1001,7 @@ private:
   std::unique_ptr<Variable> variable;
 };
 
-class LValueDeref : LValue {
+class LValueDeref : public LValue {
 public:
   LValueDeref(Location location, std::unique_ptr<LValueVariable> variable)
       : LValue(LValue_Deref, location), variable(std::move(variable)) {}
@@ -1016,7 +1017,7 @@ private:
   std::unique_ptr<LValueVariable> variable;
 };
 
-class LValueField : LValue {
+class LValueField : public LValue {
 public:
   LValueField(Location location, std::unique_ptr<LValue> structure,
               std::unique_ptr<Field> field)
@@ -1034,7 +1035,7 @@ private:
   std::unique_ptr<Field> field;
 };
 
-class LValueIndexer : LValue {
+class LValueIndexer : public LValue {
 public:
   LValueIndexer(Location location, std::unique_ptr<LValue> structure,
                 std::unique_ptr<Expression> index)
@@ -1082,7 +1083,7 @@ private:
   Location location;
 };
 
-class PatternAlias : Pattern {
+class PatternAlias : public Pattern {
 public:
   PatternAlias(Location location, std::unique_ptr<Pattern> alias,
                std::unique_ptr<Expression> expression)
@@ -1102,7 +1103,7 @@ private:
   std::unique_ptr<Expression> expression;
 };
 
-class PatternAlternative : Pattern {
+class PatternAlternative : public Pattern {
 public:
   PatternAlternative(Location location,
                      std::vector<std::unique_ptr<Pattern>> patterns)
@@ -1124,7 +1125,7 @@ public:
   virtual PatternVarDecl *getDeclaration() = 0;
 };
 
-class PatternBinding : Pattern, PatternDeclaration {
+class PatternBinding : public Pattern, public PatternDeclaration {
 public:
   PatternBinding(Location location, std::unique_ptr<PatternVarDecl> declaration)
       : Pattern(Pattern_Binding, location),
@@ -1141,7 +1142,7 @@ private:
   std::unique_ptr<PatternVarDecl> declaration;
 };
 
-class PatternWildcard : Pattern, PatternDeclaration {
+class PatternWildcard : public Pattern, public PatternDeclaration {
 public:
   PatternWildcard(Location location) : Pattern(Pattern_Wildcard, location) {}
   PatternVarDecl *getDeclaration() override { return nullptr; }
@@ -1151,7 +1152,7 @@ public:
   }
 };
 
-class PatternDeconstruction : Pattern {
+class PatternDeconstruction : public Pattern {
 public:
   PatternDeconstruction(
       Location location, std::string deconstructor,
@@ -1180,7 +1181,7 @@ private:
   std::vector<std::unique_ptr<ValueParameter>> valueParameter;
 };
 
-class PatternExpression : Pattern {
+class PatternExpression : public Pattern {
 public:
   PatternExpression(Location location, std::unique_ptr<Expression> expression)
       : Pattern(Pattern_Expression, location),
@@ -1197,7 +1198,7 @@ private:
   std::unique_ptr<Expression> expression;
 };
 
-class PatternList : Pattern {
+class PatternList : public Pattern {
 public:
   PatternList(Location location, std::vector<std::unique_ptr<Pattern>> patterns)
       : Pattern(Pattern_List, location), patterns(std::move(patterns)) {}
@@ -1210,7 +1211,7 @@ private:
   std::vector<std::unique_ptr<Pattern>> patterns;
 };
 
-class PatternLiteral : Pattern {
+class PatternLiteral : public Pattern {
 public:
   PatternLiteral(Location location, std::unique_ptr<Expression> literal)
       : Pattern(Pattern_Literal, location), literal(std::move(literal)) {}
@@ -1224,7 +1225,7 @@ private:
   std::unique_ptr<Expression> literal;
 };
 
-class PatternTuple : Pattern {
+class PatternTuple : public Pattern {
 public:
   PatternTuple(Location location,
                std::vector<std::unique_ptr<Pattern>> patterns)
@@ -1238,7 +1239,7 @@ private:
   std::vector<std::unique_ptr<Pattern>> patterns;
 };
 
-class PatternVariable : Pattern {
+class PatternVariable : public Pattern {
 public:
   PatternVariable(Location location, std::unique_ptr<Variable> literal)
       : Pattern(Pattern_Variable, location), variable(std::move(literal)) {}
@@ -1281,7 +1282,7 @@ private:
   Location location;
 };
 
-class StmtAssignment : Statement {
+class StmtAssignment : public Statement {
 public:
   StmtAssignment(Location location,
                  std::vector<std::unique_ptr<Annotation>> annotations,
@@ -1307,7 +1308,7 @@ private:
   std::unique_ptr<Expression> expression;
 };
 
-class StmtBlock : Statement {
+class StmtBlock : public Statement {
 public:
   StmtBlock(Location location,
             std::vector<std::unique_ptr<Annotation>> annotations,
@@ -1341,7 +1342,7 @@ private:
   std::vector<std::unique_ptr<Statement>> statements;
 };
 
-class StmtCall : Statement {
+class StmtCall : public Statement {
 public:
   StmtCall(Location location, std::unique_ptr<Expression> procedure,
            std::vector<std::unique_ptr<Expression>> args)
@@ -1360,7 +1361,7 @@ private:
   std::vector<std::unique_ptr<Expression>> args;
 };
 
-class StmtConsume : Statement {
+class StmtConsume : public Statement {
 public:
   StmtConsume(Location location, std::unique_ptr<Port> port, int tokens)
       : Statement(Stmt_Consume, location), port(std::move(port)),
@@ -1379,7 +1380,7 @@ private:
   int tokens;
 };
 
-class StmtForeach : Statement {
+class StmtForeach : public Statement {
 public:
   StmtForeach(Location location,
               std::vector<std::unique_ptr<Annotation>> annotations,
@@ -1409,7 +1410,7 @@ private:
   std::vector<std::unique_ptr<Statement>> body;
 };
 
-class StmtIf : Statement {
+class StmtIf : public Statement {
 public:
   StmtIf(Location location, std::unique_ptr<Expression> condition,
          std::vector<std::unique_ptr<Statement>> thenBranch,
@@ -1434,7 +1435,7 @@ private:
   std::vector<std::unique_ptr<Statement>> elseBranch;
 };
 
-class StmtRead : Statement {
+class StmtRead : public Statement {
 public:
   StmtRead(Location location, std::unique_ptr<Port> port,
            std::vector<std::unique_ptr<LValue>> lvalues,
@@ -1455,7 +1456,7 @@ private:
   std::unique_ptr<Expression> repeat;
 };
 
-class StmtWhile : Statement {
+class StmtWhile : public Statement {
 public:
   StmtWhile(Location location,
             std::vector<std::unique_ptr<Annotation>> annotations,
@@ -1478,7 +1479,7 @@ private:
   std::vector<std::unique_ptr<Statement>> body;
 };
 
-class StmtWrite : Statement {
+class StmtWrite : public Statement {
 public:
   StmtWrite(Location location, std::unique_ptr<Port> port,
             std::vector<std::unique_ptr<Expression>> values,
@@ -1726,7 +1727,7 @@ private:
   Location location;
 };
 
-class RegExpTag : RegExp {
+class RegExpTag : public RegExp {
 public:
   RegExpTag(Location location, std::unique_ptr<QID> tag)
       : RegExp(RegExp_Tag, location), tag(std::move(tag)) {}
@@ -1740,7 +1741,7 @@ private:
   std::unique_ptr<QID> tag;
 };
 
-class RegExpUnary : RegExp {
+class RegExpUnary : public RegExp {
 public:
   RegExpUnary(Location location, std::string operation,
               std::unique_ptr<RegExp> operand)
@@ -1811,7 +1812,7 @@ private:
   std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
 };
 
-class CalActor : Entity {
+class CalActor : public Entity {
 public:
   CalActor(Location &location, std::string name,
            std::vector<std::unique_ptr<Annotation>> annotations,
@@ -1886,7 +1887,7 @@ private:
   std::string name;
 };
 
-class ToolTypeAttribute : ToolAttribute {
+class ToolTypeAttribute : public ToolAttribute {
 public:
   ToolTypeAttribute(Location location, std::string name,
                     std::unique_ptr<TypeExpr> type)
@@ -1904,7 +1905,7 @@ private:
   std::unique_ptr<TypeExpr> type;
 };
 
-class ToolValueAttribute : ToolAttribute {
+class ToolValueAttribute : public ToolAttribute {
 public:
   ToolValueAttribute(Location location, std::string name,
                      std::unique_ptr<Expression> value)
@@ -1939,7 +1940,7 @@ private:
   Location location;
 };
 
-class EntityRefLocal : EntityReference {
+class EntityRefLocal : public EntityReference {
 public:
   EntityRefLocal(Location location, std::string name)
       : EntityReference(EntityRef_Local, location), name(name) {}
@@ -1954,7 +1955,7 @@ private:
   std::string name;
 };
 
-class EntityRefGlobal : EntityReference {
+class EntityRefGlobal : public EntityReference {
 public:
   EntityRefGlobal(Location location, std::unique_ptr<QID> globalName)
       : EntityReference(EntityRef_Global, location),
@@ -2008,7 +2009,7 @@ private:
   Location location;
 };
 
-class EntityComprehensionExpr : EntityExpr {
+class EntityComprehensionExpr : public EntityExpr {
 public:
   EntityComprehensionExpr(Location location,
                           std::unique_ptr<Generator> generator,
@@ -2032,7 +2033,7 @@ private:
   std::unique_ptr<EntityExpr> collection;
 };
 
-class EntityIfExpr : EntityExpr {
+class EntityIfExpr : public EntityExpr {
 public:
   EntityIfExpr(Location location, std::unique_ptr<Expression> condition,
                std::unique_ptr<EntityExpr> trueEntity,
@@ -2056,7 +2057,7 @@ private:
   std::unique_ptr<EntityExpr> falseEntity;
 };
 
-class EntityInstanceExpr : EntityExpr, Attributable {
+class EntityInstanceExpr : public EntityExpr, Attributable {
 public:
   EntityInstanceExpr(
       Location location, std::vector<std::unique_ptr<ToolAttribute>> attributes,
@@ -2086,7 +2087,7 @@ private:
   std::vector<std::unique_ptr<ValueParameter>> valueParameters;
 };
 
-class EntityListExpr : EntityExpr {
+class EntityListExpr : public EntityExpr {
 public:
   EntityListExpr(Location location,
                  std::vector<std::unique_ptr<EntityExpr>> entityList)
@@ -2151,7 +2152,7 @@ private:
   Location location;
 };
 
-class StructureConnectionStmt : StructureStmt {
+class StructureConnectionStmt : public StructureStmt {
 public:
   StructureConnectionStmt(Location location, std::unique_ptr<PortReference> src,
                           std::unique_ptr<PortReference> dst)
@@ -2170,7 +2171,7 @@ private:
   std::unique_ptr<PortReference> src, dst;
 };
 
-class StructureForeachStmt : StructureStmt {
+class StructureForeachStmt : public StructureStmt {
 public:
   StructureForeachStmt(Location location, std::unique_ptr<Generator> generator,
                        std::vector<std::unique_ptr<Expression>> filters,
@@ -2196,7 +2197,7 @@ private:
   std::vector<std::unique_ptr<Statement>> statements;
 };
 
-class StructureIfStmt : StructureStmt {
+class StructureIfStmt : public StructureStmt {
 public:
   StructureIfStmt(Location location, std::unique_ptr<Expression> condition,
                   std::vector<std::unique_ptr<StructureStmt>> trueStmt,
@@ -2244,7 +2245,7 @@ private:
   std::unique_ptr<EntityExpr> entity;
 };
 
-class NLNetwork : Entity {
+class NLNetwork : public Entity {
 public:
   NLNetwork(Location location, std::string name,
             std::vector<std::unique_ptr<Annotation>> annotations,

@@ -313,7 +313,8 @@ std::unique_ptr<cal::NamespaceDecl> NamespaceDeclContents(std::unique_ptr<cal::Q
 }
 {
 	(
-		i = Import() ";" { imports.push_back(i); }
+		i = Import() ";" { //imports.push_back(i);
+		}
 
 	)*
 	{
@@ -351,7 +352,7 @@ std::unique_ptr<cal::Import> Import() :
 	}
 }
 
-std::unique_ptr<cal::Import> GroupImportTail() :
+std::unique_ptr<cal::GroupImport> GroupImportTail() :
 {
 	std::unique_ptr<cal::QID> globalName;
 	cal::Import::Prefix kind = Import::Prefix::VAR;
@@ -361,7 +362,7 @@ std::unique_ptr<cal::Import> GroupImportTail() :
 	(kind = ImportKind())?
 	globalName = QID()
 	{
-		Location loc;
+		Location loc = {0,0,0,0};
 		return std::make_unique<cal::GroupImport>(loc, kind, std::move(globalName));
 	}
 }
