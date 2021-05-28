@@ -1,5 +1,5 @@
 namespace toto:
 
-null + a
+int(type:int, c=20)
 
 end

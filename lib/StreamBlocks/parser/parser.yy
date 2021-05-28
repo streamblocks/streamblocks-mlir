@@ -193,10 +193,18 @@
 /*%printer { yyo << $$; } <*>;*/
 
 %type <std::unique_ptr<cal::QID>> simple_qid qid
+
 %type <std::unique_ptr<cal::NamespaceDecl>> namespace_decl namespace_decl_default
+
 %type <cal::Import::Prefix> import_kind
+
 %type <std::unique_ptr<cal::Import>> import single_import group_import
+
 %type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr
+
+%type <std::unique_ptr<cal::Parameter>> parameter_assignment type_parameter value_parameter
+
+%type <std::unique_ptr<cal::TypeExpr>> type nominal_type
 
 %left "||" "or"
 %left "&&" "and"
@@ -233,7 +241,7 @@ qid : simple_qid
 
 /* Namespace */
 
-namespace_decl:  "namespace" qid ":" expr "end"
+namespace_decl:  "namespace" qid ":" type "end"
               ;
 
 namespace_decl_default : imports
@@ -344,6 +352,56 @@ if_expr: "if" expr "then" expr elsif_expr "end" {$$ = std::make_unique<ExprIf>(@
 elsif_expr: "elsif" expr "then" expr elsif_expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($5)); }
           | "elsif" expr "then" expr "else" expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($6)); }
           ;
+
+/* Types */
+
+type : nominal_type
+     ;
+
+nominal_type: ID
+              {
+                std::vector<std::unique_ptr<TypeParameter>> types;
+                std::vector<std::unique_ptr<ValueParameter>> values;
+                $$ = std::make_unique<NominalTypeExpr>(@$, $1, std::move(types), std::move(values));
+              }
+              | ID "(" parameter_assignments ")"
+              {
+                 std::vector<std::unique_ptr<TypeParameter>> types;
+                 std::vector<std::unique_ptr<ValueParameter>> values;
+
+                 std::vector<std::unique_ptr<Parameter>> parameters = $3;
+
+                 for (auto& item : parameters) {
+                    if(item->getKind() == cal::Parameter::ParameterKind::Param_Type){
+                        auto t = std::unique_ptr<cal::TypeParameter>(static_cast<cal::TypeParameter*>(item.release()));
+                        types.push_back(std::move(t));
+                    }else{
+                        auto t = std::unique_ptr<cal::ValueParameter>(static_cast<cal::ValueParameter*>(item.release()));
+                        values.push_back(std::move(t));
+                    }
+                 }
+
+                 $$ = std::make_unique<NominalTypeExpr>(@$, $1, std::move(types), std::move(values));
+              }
+            ;
+
+/* Parameter */
+
+%nterm <std::vector<std::unique_ptr<Parameter>>> parameter_assignments;
+parameter_assignments: parameter_assignment { $$.push_back($1); }
+                     | parameter_assignments "," parameter_assignment { $$=$1; $$.push_back($3); }
+                     ;
+
+
+parameter_assignment: type_parameter
+                    | value_parameter
+                     ;
+
+value_parameter: ID "=" expr { $$ = std::make_unique<ValueParameter>(@$, $1, std::move($3)); }
+               ;
+
+type_parameter: "type" ":" type {$$ = std::make_unique<TypeParameter>(@$, "type", std::move($3));}
+              | ID     ":" type {$$ = std::make_unique<TypeParameter>(@$, $1,     std::move($3));}
 
 %%
 

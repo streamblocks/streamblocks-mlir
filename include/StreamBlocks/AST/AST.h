@@ -160,6 +160,7 @@ private:
 };
 
 class TypeParameter : public Parameter {
+public:
   TypeParameter(Location loc, std::string name, std::unique_ptr<TypeExpr> value)
       : Parameter(Param_Type, loc), name(name), value(std::move(value)) {}
 
@@ -175,6 +176,7 @@ private:
 };
 
 class ValueParameter : public Parameter {
+public:
   ValueParameter(Location loc, std::string name,
                  std::unique_ptr<Expression> value)
       : Parameter(Param_Value, loc), name(name), value(std::move(value)) {}
