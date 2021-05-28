@@ -1,9 +1,5 @@
-/*
-ffkfk
+namespace toto:
 
-*/
+null + a
 
-namespace test:
-    import var test;
-    import var toto;
 end

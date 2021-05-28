@@ -46,128 +46,148 @@
 }
 
 %define api.token.prefix {TOK_}
-%token
-    EOF  0  "end of file"
-    /* -- Keywords --*/
-    ACTION "action"
-    ACTOR "actor"
-    ALIAS "alias"
-    ALL "all"
-    AND "and"
-    ANY "any"
-    AS "as"
-    ASSIGN "assign"
-    AT "at"
-    AT_STAR "at*"
-    BEGIN_ "begin"
-    CASE "case"
-    CHOOSE "choose"
-    CONST "const"
-    DEFAULT "default"
-    DELAY "delay"
-    DIV  "div"
-    DO "do"
-    DOM "dom"
-    ELSE "else"
-    ELSIF "elsif"
-    END "end"
-    ENDACTION "endaction"
-    ENDASSIGN "endassign"
-    ENDACTOR "endactor"
-    ENDCASE "endcase"
-    ENDBEGIN "endbegin"
-    ENDCHOOSE "endchoose"
-    ENDFOREACH "endforeach"
-    ENDFUNCTION "endfunction"
-    ENDIF "endif"
-    ENDINITIALIZE "endinitialize"
-    ENDINVARIANT "endinvariant"
-    ENDLAMBDA "endlambda"
-    ENDLET "endlet"
-    ENDPRIORITY "endpriority"
-    ENDPROC "endproc"
-    ENDPROCEDURE "endprocedure"
-    ENDSCHEDULE "endschedule"
-    ENDWHILE "endwhile"
-    ENTITY "entity"
-    ENSURE "ensure"
-    FALSE "false"
-    FOR "for"
-    FOREACH "foreach"
-    FSM  "fsm"
-    FUNCTION "function"
-    GUARD "guard"
-    IF "if"
-    IMPORT "import"
-    IN "in"
-    INITIALIZE "initialize"
-    INVARIANT "invariant"
-    LAMBDA "lambda"
-    LET "let"
-    MAP "map"
-    MOD "mod"
-    MULTI "multi"
-    MUTABLE "mutable"
-    NAMESPACE "namespace"
-    NOT "not"
-    NULL "null"
-    OLD "old"
-    OF "of"
-    OR "or"
-    PRIORITY "priority"
-    PROC "proc"
-    PACKAGE "package"
-    PROCEDURE "procedure"
-    REGEXP "regexp"
-    REPEAT "repeat"
-    REQUIRE "require"
-    RNG "rng"
-    SCHEDULE "schedule"
-    TIME "time"
-    THEN "then"
-    TRUE "true"
-    TO "to"
-    TYPE "type"
-    VAR "var"
-    WHILE "while"
-    PUBLIC "public"
-    PRIVATE "private"
-    LOCAL "local"
-    NETWORK "network"
-    ENTITIES "entities"
-    STRUCTURE "structure"
-    EXTERNAL "external"
 
-    /* -- Delimiters --*/
-    COLON ":"
-    COLON_EQUALS ":="
-    COMMA ","
-    DASH_DASH_GT "-->"
-    DASH_GT "->"
-    DOT "."
-    DOT_DOT ".."
-    EQUALS "="
-    EQUALS_EQUALS_GT "==>"
-    HASH "#"
-    LBRACE "{"
-    LBRACK "["
-    LPAR "("
-    LT "<"
-    GT ">"
-    PLUS "+"
-    QMARK "?"
-    RBRACE "}"
-    RBRACK "]"
-    RPAR ")"
-    SEMI ";"
-    STAR "*"
-    UNDER_SCORE "_"
-    VBAR "|"
-    CINNAMON_BUN "@"
-;
+%token EOF  0  "end of file"
+/* -- Keywords --*/
+%token ACTION "action"
+%token ACTOR "actor"
+%token ALIAS "alias"
+%token ALL "all"
+%token ANY "any"
+%token AS "as"
+%token ASSIGN "assign"
+%token AT "at"
+%token AT_STAR "at*"
+%token BEGIN_ "begin"
+%token CASE "case"
+%token CHOOSE "choose"
+%token CONST "const"
+%token DEFAULT "default"
+%token DELAY "delay"
+%token DO "do"
+%token ELSE "else"
+%token ELSIF "elsif"
+%token END "end"
+%token ENDACTION "endaction"
+%token ENDASSIGN "endassign"
+%token ENDACTOR "endactor"
+%token ENDCASE "endcase"
+%token ENDBEGIN "endbegin"
+%token ENDCHOOSE "endchoose"
+%token ENDFOREACH "endforeach"
+%token ENDFUNCTION "endfunction"
+%token ENDIF "endif"
+%token ENDINITIALIZE "endinitialize"
+%token ENDINVARIANT "endinvariant"
+%token ENDLAMBDA "endlambda"
+%token ENDLET "endlet"
+%token ENDPRIORITY "endpriority"
+%token ENDPROC "endproc"
+%token ENDPROCEDURE "endprocedure"
+%token ENDSCHEDULE "endschedule"
+%token ENDWHILE "endwhile"
+%token ENTITY "entity"
+%token ENSURE "ensure"
+%token FALSE "false"
+%token FOR "for"
+%token FOREACH "foreach"
+%token FSM  "fsm"
+%token FUNCTION "function"
+%token GUARD "guard"
+%token IF "if"
+%token IMPORT "import"
+%token INITIALIZE "initialize"
+%token INVARIANT "invariant"
+%token LAMBDA "lambda"
+%token LET "let"
+%token MAP "map"
+%token MULTI "multi"
+%token MUTABLE "mutable"
+%token NAMESPACE "namespace"
+%token NULL "null"
+%token OLD "old"
+%token OF "of"
+%token PRIORITY "priority"
+%token PROC "proc"
+%token PACKAGE "package"
+%token PROCEDURE "procedure"
+%token REGEXP "regexp"
+%token REPEAT "repeat"
+%token REQUIRE "require"
+
+%token SCHEDULE "schedule"
+%token TIME "time"
+%token THEN "then"
+%token TRUE "true"
+%token TO "to"
+%token TYPE "type"
+%token VAR "var"
+%token WHILE "while"
+%token PUBLIC "public"
+%token PRIVATE "private"
+%token LOCAL "local"
+%token NETWORK "network"
+%token ENTITIES "entities"
+%token STRUCTURE "structure"
+%token EXTERNAL "external"
+
+/* -- Delimiters --*/
+%token COLON ":"
+%token COLON_EQUALS ":="
+%token COMMA ","
+%token DASH_DASH_GT "-->"
+%token DASH_GT "->"
+%token DOT "."
+%token DOT_DOT ".."
+%token EQUALS_EQUALS_GT "==>"
+%token LBRACE "{"
+%token LBRACK "["
+%token LPAR "("
+%token RBRACE "}"
+%token RBRACK "]"
+%token RPAR ")"
+%token SEMI ";"
+%token UNDER_SCORE "_"
+%token CINNAMON_BUN "@"
+
+/* -- Operators -- */
+%token <std::string> AND "and"
+%token <std::string> AMPERSAND "&"
+%token <std::string> AMPERSAND_AMPERSAND "&&"
+%token <std::string> CARET "^"
+%token <std::string> DIV "div"
+%token <std::string> DOM "dom"
+%token <std::string> EQUALS "="
+%token <std::string> EQUALS_EQUALS "=="
+%token <std::string> HASH "#"
+%token <std::string> GT ">"
+%token <std::string> GT_EQUALS ">="
+%token <std::string> GT_GT ">>"
+%token <std::string> IN "in"
+%token <std::string> LT "<"
+%token <std::string> LT_EQUALS "<="
+%token <std::string> LT_LT "<<"
+%token <std::string> MINUS "-"
+%token <std::string> MOD "mod"
+%token <std::string> NOT "not"
+%token <std::string> NOT_EQUALS "!="
+%token <std::string> OR "or"
+%token <std::string> PERC "%"
+%token <std::string> PLUS "+"
+%token <std::string> QMARK "?"
+%token <std::string> RNG "rng"
+%token <std::string> SLASH "/"
+%token <std::string> STAR "*"
+%token <std::string> STAR_STAR "**"
+%token <std::string> VBAR "|"
+%token <std::string> VBAR_VBAR "||"
+%token <std::string> TILDE "~"
 
 %token <std::string> ID
-%token <int> NUMBER
+%token <long>        LONG
+%token <double>      REAL
+%token <std::string> STRING
+%token <char>        CHAR
 
 
 /*%printer { yyo << $$; } <*>;*/
@@ -176,8 +196,19 @@
 %type <std::unique_ptr<cal::NamespaceDecl>> namespace_decl namespace_decl_default
 %type <cal::Import::Prefix> import_kind
 %type <std::unique_ptr<cal::Import>> import single_import group_import
+%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr
 
-
+%left "||" "or"
+%left "&&" "and"
+%left "|"
+%left "^"
+%left "&"
+%left "!=" "==" "="
+%left ">=" ">" "<=" "<"
+%left ">>" "<<"
+%left "-" "+"
+%left "div" "%" "mod" "*" "/"
+%left "**"
 
 %%
 %start unit;
@@ -202,7 +233,7 @@ qid : simple_qid
 
 /* Namespace */
 
-namespace_decl:  "namespace" qid ":" imports "end"
+namespace_decl:  "namespace" qid ":" expr "end"
               ;
 
 namespace_decl_default : imports
@@ -243,8 +274,76 @@ imports: %empty {/* empty */}
 
 /* Expression */
 
+expr: var_expr
+    | literal_expr
+    | binary_expr
+    | unary_expr
+    | tuple_expr
+    | "(" expr ")" {$$ = $2;}
+    | if_expr
+    ;
+
+var_expr : ID { $$ = std::make_unique<cal::ExprVariable>(@$, $1); }
+         ;
+
+literal_expr: LONG    { $$ = std::make_unique<cal::ExprLiteralLong>(@$, $1); }
+            | REAL    { $$ = std::make_unique<cal::ExprLiteralReal>(@$, $1); }
+            | "true"  { $$ = std::make_unique<cal::ExprLiteralBool>(@$, true); }
+            | "false" { $$ = std::make_unique<cal::ExprLiteralBool>(@$, false); }
+            | "null"  { $$ = std::make_unique<cal::ExprLiteralNull>(@$); }
+            | STRING  { $$ = std::make_unique<cal::ExprLiteralString>(@$, $1); }
+            | CHAR    { $$ = std::make_unique<cal::ExprLiteralChar>(@$, $1); }
+            ;
+
+binary_expr : expr "||"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "or"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "&&"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "and" expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "|"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "^"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "&"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "!="  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "=="  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "="   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr ">="  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr ">"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "<="  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "<"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "<<"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr ">>"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "+"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "-"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "div" expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "/"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "mod" expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "%"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "*"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "**"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            ;
+
+unary_expr: "not" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          | "~"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          | "#"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          | "dom" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          | "rng" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          | "-"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+          ;
 
 
+tuple_expr: "(" tuple_expr_list ")" { $$ = std::make_unique<cal::ExprTuple>(@$, std::move($2)); }
+
+%nterm <std::vector<std::unique_ptr<cal::Expression>>> tuple_expr_list;
+tuple_expr_list: expr { $$.push_back($1); }
+               | tuple_expr_list "," expr { $$=$1; $$.push_back($3); }
+               ;
+
+if_expr: "if" expr "then" expr elsif_expr "end" {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($5)); }
+       | "if" expr "then" expr "else" expr "end"  {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($6)); }
+       ;
+
+elsif_expr: "elsif" expr "then" expr elsif_expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($5)); }
+          | "elsif" expr "then" expr "else" expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($6)); }
+          ;
 
 %%
 

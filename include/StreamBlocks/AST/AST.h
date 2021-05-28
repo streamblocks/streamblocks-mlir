@@ -20,16 +20,14 @@
 #include <string>
 #include <vector>
 
+#include "location.hh"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
-#include "location.hh"
 
 #include "QID.h"
 
 using Location = cal::location;
-
-
 
 namespace cal {
 
@@ -230,11 +228,7 @@ private:
   std::string name;
 };
 
-enum Availability {
-  PUBLIC,
-  PRIVATE,
-  LOCAL
-};
+enum Availability { PUBLIC, PRIVATE, LOCAL };
 
 class GlobalDecl {
 public:
@@ -505,10 +499,10 @@ private:
 
 class SingleImport : public Import {
 public:
-  SingleImport(Location location, Prefix prefix, std::unique_ptr<QID> globalName,
-               std::string localName)
-      : Import(Import_Single, location, prefix), globalName(std::move(globalName)),
-        localName(localName) {}
+  SingleImport(Location location, Prefix prefix,
+               std::unique_ptr<QID> globalName, std::string localName)
+      : Import(Import_Single, location, prefix),
+        globalName(std::move(globalName)), localName(localName) {}
 
 private:
   std::unique_ptr<QID> globalName;
@@ -517,9 +511,9 @@ private:
 
 class GroupImport : public Import {
 public:
-  GroupImport(Location location, Prefix prefix,
-              std::unique_ptr<QID> globalName)
-      : Import(Import_Group, location, prefix), globalName(std::move(globalName)) {}
+  GroupImport(Location location, Prefix prefix, std::unique_ptr<QID> globalName)
+      : Import(Import_Group, location, prefix),
+        globalName(std::move(globalName)) {}
 
 private:
   std::unique_ptr<QID> globalName;
@@ -657,14 +651,17 @@ private:
 class Expression {
 public:
   enum ExpressionKind {
-    Expr_Literal_Integer,
-    Expr_Literal_Double,
+    Expr_Literal_Long,
+    Expr_Literal_Real,
+    Expr_Literal_Char,
     Expr_Literal_String,
     Expr_Literal_Bool,
+    Expr_Literal_Null,
     Expr_Variable,
     Expr_Unary,
     Expr_Binary,
     Expr_Application,
+    Expr_If,
     Expr_Indexer,
     Expr_List,
     Expr_Set,
@@ -686,41 +683,57 @@ private:
   Location location;
 };
 
-class ExprLiteralInteger : public Expression {
+class ExprLiteralLong : public Expression {
 public:
-  ExprLiteralInteger(Location loc, const int value)
-      : Expression(Expr_Literal_Integer, loc), value(value) {}
-  int getValue() { return value; }
+  ExprLiteralLong(Location loc, const long value)
+      : Expression(Expr_Literal_Long, loc), value(value) {}
+  long getValue() { return value; }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
-    return c->getKind() == Expr_Literal_Integer;
+    return c->getKind() == Expr_Literal_Long;
   }
 
 private:
-  const int value;
+  const long value;
 };
 
-class ExprLiteralDouble : public Expression {
+class ExprLiteralReal : public Expression {
 public:
-  ExprLiteralDouble(Location loc, const double value)
-      : Expression(Expr_Literal_Double, loc), value(value) {}
+  ExprLiteralReal(Location loc, const double value)
+      : Expression(Expr_Literal_Real, loc), value(value) {}
   double getValue() { return value; }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
-    return c->getKind() == Expr_Literal_Double;
+    return c->getKind() == Expr_Literal_Real;
   }
 
 private:
   const double value;
 };
 
+class ExprLiteralChar : public Expression {
+public:
+  ExprLiteralChar(Location loc, const char value)
+      : Expression(Expr_Literal_Char, loc), value(value) {}
+  char getValue() { return value; }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) {
+    return c->getKind() == Expr_Literal_Char;
+  }
+
+private:
+  const char value;
+};
+
+
 class ExprLiteralString : public Expression {
 public:
   ExprLiteralString(Location loc, std::string value)
       : Expression(Expr_Literal_String, loc), value(value) {}
-  std::string getValue() { return value; }
+  llvm::StringRef getValue() { return value; }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -746,6 +759,20 @@ private:
   const bool value;
 };
 
+
+class ExprLiteralNull : public Expression {
+public:
+  ExprLiteralNull(Location loc)
+      : Expression(Expr_Literal_Bool, loc) {}
+
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) {
+    return c->getKind() == Expr_Literal_Bool;
+  }
+
+};
+
 class ExprVariable : public Expression {
 public:
   ExprVariable(Location loc, llvm::StringRef name)
@@ -763,11 +790,12 @@ private:
 
 class ExprUnary : public Expression {
 public:
-  ExprUnary(Location loc, char Op, std::unique_ptr<Expression> expression)
+  ExprUnary(Location loc, std::string Op,
+            std::unique_ptr<Expression> expression)
       : Expression(Expr_Unary, loc), op(Op), expression(std::move(expression)) {
   }
 
-  char getOp() { return op; }
+  llvm::StringRef getOp() { return op; }
   Expression *getExpression() { return expression.get(); }
 
   /// LLVM style RTTI
@@ -776,7 +804,7 @@ public:
   }
 
 private:
-  char op;
+  std::string op;
   std::unique_ptr<Expression> expression;
 };
 
@@ -839,6 +867,27 @@ public:
 
 private:
   std::unique_ptr<Expression> structure, index;
+};
+
+class ExprIf : public Expression {
+public:
+  ExprIf(Location location, std::unique_ptr<Expression> condition,
+         std::unique_ptr<Expression> thenExpr,
+         std::unique_ptr<Expression> elseExpr)
+      : Expression(Expr_If, location), condition(std::move(condition)),
+        thenExpr(std::move(thenExpr)), elseExpr(std::move(elseExpr)) {}
+
+  Expression *getCondition() { return condition.get(); }
+  Expression *getThen() { return thenExpr.get(); }
+  Expression *getElse() { return elseExpr.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) { return c->getKind() == Expr_If; }
+
+private:
+  std::unique_ptr<Expression> condition;
+  std::unique_ptr<Expression> thenExpr;
+  std::unique_ptr<Expression> elseExpr;
 };
 
 class ExprList : public Expression {

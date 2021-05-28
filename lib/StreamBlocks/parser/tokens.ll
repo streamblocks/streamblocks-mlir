@@ -4,6 +4,7 @@
 # include <cstdlib>
 # include <cstring> // strerror
 # include <string>
+# include <float.h>
 # include "driver.h"
 # include "cal_parser.hpp"
 %}
@@ -73,14 +74,79 @@
 
 %option noyywrap nounput noinput batch debug
 
+%x BLOCK_COMMENT
+
 %{
   // A number symbol corresponding to the value in S.
   cal::CalParser::symbol_type
-  make_NUMBER (const std::string &s, const cal::CalParser::location_type& loc);
+  make_LONG (const std::string &s, const cal::CalParser::location_type& loc, int base);
+  cal::CalParser::symbol_type
+  make_DOUBLE (const std::string &s, const cal::CalParser::location_type& loc);
 %}
 
-id    [a-zA-Z][a-zA-Z_0-9]*
-int   [0-9]+
+/* ------------------- definitions -------------------- */
+/* newline */
+NL            "\n"
+
+/* anything but newline */
+NOTNL         .
+
+/* any of 256 source characters */
+ANY           ({NOTNL}|{NL})
+
+/* backslash */
+BACKSL        "\\"
+
+/* beginnging of line (must be start of a pattern) */
+BOL           ^
+
+/* end of line (would like EOF to qualify also, but flex doesn't allow it */
+EOL           {NL}
+
+/* letter or underscore */
+LETTER        [A-Za-z_]
+
+/* letter or underscore or digit */
+ALNUM         [A-Za-z_0-9]
+
+/* decimal digit */
+DIGIT         [0-9]
+HEXDIGIT      [0-9A-Fa-f]
+
+/* sequence of decimal digits */
+DIGITS        ({DIGIT}+)
+/* sequence of hex digits */
+HEXDIGITS     ({HEXDIGIT}+)
+
+/* sign of a number */
+SIGN          ("+"|"-")
+
+/* integer suffix */
+/* added 'LL' option for gcc/c99 long long compatibility */
+ELL_SUFFIX    [lL]([lL]?)
+INT_SUFFIX    ([uU]{ELL_SUFFIX}?|{ELL_SUFFIX}[uU]?)
+
+/* floating-point suffix letter */
+FLOAT_SUFFIX  [flFL]
+
+/* normal string character: any but quote, newline, or backslash */
+STRCHAR       [^\"\n\\]
+
+/* (start of) an escape sequence */
+ESCAPE        ({BACKSL}{ANY})
+
+/* double quote */
+QUOTE         [\"]
+
+/* normal character literal character: any but single-quote, newline, or backslash */
+CCCHAR        [^\'\n\\]
+
+/* single quote */
+TICK          [\']
+
+/* space or tab */
+SPTAB         [ \t]
+
 blank [ \t\r]
 
 %{
@@ -88,7 +154,7 @@ blank [ \t\r]
   # define YY_USER_ACTION  loc.columns (yyleng);
 %}
 
-%x BLOCK_COMMENT
+
 
 %%
 %{
@@ -97,25 +163,15 @@ blank [ \t\r]
   // Code run each time yylex is called.
   loc.step ();
 %}
+
 {blank}+   loc.step ();
 \n+        loc.lines (yyleng); loc.step ();
-
-<INITIAL>{
-"/*"              BEGIN(BLOCK_COMMENT);
-}
-<BLOCK_COMMENT>{
-"*/"      BEGIN(INITIAL);
-[^*\n]+   // eat comment in chunks
-"*"       // eat the lone star
-\n        loc.lines (yyleng);
-}
 
 
 
 "action" { return cal::CalParser::make_ACTION(loc); }
 "actor" { return cal::CalParser::make_ACTOR(loc); }
 "all" { return cal::CalParser::make_ALL(loc); }
-"and" { return cal::CalParser::make_AND(loc); }
 "any" { return cal::CalParser::make_ANY(loc); }
 "assign" { return cal::CalParser::make_ASSIGN(loc); }
 "at" { return cal::CalParser::make_AT(loc); }
@@ -126,9 +182,7 @@ blank [ \t\r]
 "choose" { return cal::CalParser::make_CHOOSE(loc); }
 "default" { return cal::CalParser::make_DEFAULT(loc); }
 "delay" { return cal::CalParser::make_DELAY(loc); }
-"div" { return cal::CalParser::make_DIV(loc); }
 "do" { return cal::CalParser::make_DO(loc); }
-"dom" { return cal::CalParser::make_DOM(loc); }
 "else" { return cal::CalParser::make_ELSE(loc); }
 "elsif" { return cal::CalParser::make_ELSIF(loc); }
 "end" { return cal::CalParser::make_END(loc); }
@@ -158,20 +212,16 @@ blank [ \t\r]
 "guard" { return cal::CalParser::make_GUARD(loc); }
 "if" { return cal::CalParser::make_IF(loc); }
 "import" { return cal::CalParser::make_IMPORT(loc); }
-"in" { return cal::CalParser::make_IN(loc); }
 "initialize" { return cal::CalParser::make_INITIALIZE(loc); }
 "invariant" { return cal::CalParser::make_INVARIANT(loc); }
 "lambda" { return cal::CalParser::make_LAMBDA(loc); }
 "let" { return cal::CalParser::make_LET(loc); }
 "map" { return cal::CalParser::make_MAP(loc); }
-"mod" { return cal::CalParser::make_MOD(loc); }
 "multi" { return cal::CalParser::make_MULTI(loc); }
 "mutable" { return cal::CalParser::make_MUTABLE(loc); }
 "namespace" { return cal::CalParser::make_NAMESPACE(loc); }
-"not" { return cal::CalParser::make_NOT(loc); }
 "null" { return cal::CalParser::make_NULL(loc); }
 "old" { return cal::CalParser::make_OLD(loc); }
-"or" { return cal::CalParser::make_OR(loc); }
 "package" { return cal::CalParser::make_PACKAGE(loc); }
 "priority" { return cal::CalParser::make_PRIORITY(loc); }
 "proc" { return cal::CalParser::make_PROC(loc); }
@@ -187,6 +237,7 @@ blank [ \t\r]
 "var" { return cal::CalParser::make_VAR(loc); }
 "while" { return cal::CalParser::make_WHILE(loc); }
 
+
 ":" { return cal::CalParser::make_COLON(loc); }
 ":=" { return cal::CalParser::make_COLON_EQUALS(loc); }
 "," { return cal::CalParser::make_COMMA(loc); }
@@ -194,31 +245,134 @@ blank [ \t\r]
 "->" { return cal::CalParser::make_DASH_GT(loc); }
 "." { return cal::CalParser::make_DOT(loc); }
 ".." { return cal::CalParser::make_DOT_DOT(loc); }
-"=" { return cal::CalParser::make_EQUALS(loc); }
 "==>" { return cal::CalParser::make_EQUALS_EQUALS_GT(loc); }
-"#" { return cal::CalParser::make_HASH(loc); }
 "{" { return cal::CalParser::make_LBRACE(loc); }
 "[" { return cal::CalParser::make_RBRACE(loc); }
 "(" { return cal::CalParser::make_LPAR(loc); }
-"<" { return cal::CalParser::make_LT(loc); }
-">" { return cal::CalParser::make_GT(loc); }
-"+" { return cal::CalParser::make_PLUS(loc); }
-"?" { return cal::CalParser::make_QMARK(loc); }
 "}" { return cal::CalParser::make_RBRACE(loc); }
 "]" { return cal::CalParser::make_RBRACK(loc); }
 ")" { return cal::CalParser::make_RPAR(loc); }
 ";" { return cal::CalParser::make_SEMI(loc); }
-"*" { return cal::CalParser::make_STAR(loc); }
 "_" { return cal::CalParser::make_UNDER_SCORE(loc); }
-"|" { return cal::CalParser::make_VBAR(loc); }
 "@" { return cal::CalParser::make_CINNAMON_BUN(loc); }
 
 
+"and" { return cal::CalParser::make_AND(yytext, loc); }
+"&"   { return cal::CalParser::make_AMPERSAND(yytext, loc); }
+"&&"  { return cal::CalParser::make_AMPERSAND_AMPERSAND(yytext, loc); }
+"^"   { return cal::CalParser::make_CARET(yytext, loc); }
+"div" { return cal::CalParser::make_DIV(yytext, loc); }
+"dom" { return cal::CalParser::make_DOM(yytext, loc); }
+"="   { return cal::CalParser::make_EQUALS(yytext, loc); }
+"=="  { return cal::CalParser::make_EQUALS_EQUALS(yytext, loc); }
+"#"   { return cal::CalParser::make_HASH(yytext, loc); }
+">"   { return cal::CalParser::make_GT(yytext, loc); }
+">="  { return cal::CalParser::make_GT_EQUALS(yytext, loc); }
+">>"  { return cal::CalParser::make_GT_GT(yytext, loc); }
+"-"   { return cal::CalParser::make_MINUS(yytext, loc); }
+"in"  { return cal::CalParser::make_IN(yytext, loc); }
+"<"   { return cal::CalParser::make_LT(yytext, loc); }
+"<="  { return cal::CalParser::make_LT_EQUALS(yytext, loc); }
+"<<"  { return cal::CalParser::make_LT_LT(yytext, loc); }
+"mod" { return cal::CalParser::make_MOD(yytext, loc); }
+"not" { return cal::CalParser::make_NOT(yytext, loc); }
+"!="  { return cal::CalParser::make_NOT_EQUALS(yytext, loc); }
+"or"  { return cal::CalParser::make_OR(yytext, loc); }
+"%"   { return cal::CalParser::make_PERC(yytext, loc); }
+"+"   { return cal::CalParser::make_PLUS(yytext, loc); }
+"?"   { return cal::CalParser::make_QMARK(yytext, loc); }
+"rng" { return cal::CalParser::make_RNG(yytext, loc); }
+"/"   { return cal::CalParser::make_SLASH(yytext, loc); }
+"*"   { return cal::CalParser::make_STAR(yytext, loc); }
+"**"  { return cal::CalParser::make_STAR_STAR(yytext, loc); }
+"|"   { return cal::CalParser::make_VBAR(yytext, loc); }
+"||"  { return cal::CalParser::make_VBAR_VBAR(yytext, loc); }
+"~"   { return cal::CalParser::make_TILDE(yytext, loc); }
 
 
+  /* identifier: e.g. foo */
+{LETTER}{ALNUM}* {
+  return cal::CalParser::make_ID (yytext, loc);
+}
 
-{int}      return make_NUMBER (yytext, loc);
-{id}       return cal::CalParser::make_ID (yytext, loc);
+ /* Integers */
+[1-9][0-9]*{INT_SUFFIX}?  {
+    return make_LONG (yytext, loc, 10);
+}
+
+0][0-7]*{INT_SUFFIX}?  {
+    return make_LONG (yytext, loc, 8);
+}
+[0][xX][0-9A-Fa-f]+{INT_SUFFIX}? {
+    return make_LONG (yytext, loc, 16);
+}
+
+[0][xX] {
+  throw cal::CalParser::syntax_error (loc, "hexadecimal literal with nothing after the 'x'");
+}
+
+ /* Doubles */
+
+ /* real literal */
+{DIGITS}"."{DIGITS}?([eE]{SIGN}?{DIGITS})?{FLOAT_SUFFIX}?   |
+{DIGITS}"."?([eE]{SIGN}?{DIGITS})?{FLOAT_SUFFIX}?	    |
+"."{DIGITS}([eE]{SIGN}?{DIGITS})?{FLOAT_SUFFIX}?	    {
+  return make_DOUBLE (yytext, loc);
+}
+
+  /* real literal with no digits after the 'e' */
+{DIGITS}"."{DIGITS}?[eE]{SIGN}?   |
+{DIGITS}"."?[eE]{SIGN}?           |
+"."{DIGITS}[eE]{SIGN}?            {
+  throw cal::CalParser::syntax_error (loc, "real literal with no digits after the 'e'");
+  /* in recovery rules like this it's best to yield the best-guess
+   * token type, instead of some TOK_ERROR, so the parser can still
+   * try to make sense of the input; having reported the error is
+   * sufficient to ensure that later stages won't try to interpret
+   * the lexical text of this token as a floating literal */
+}
+
+
+  /* string literal */
+"L"?{QUOTE}({STRCHAR}|{ESCAPE})*{QUOTE} {
+  return cal::CalParser::make_STRING (yytext, loc);
+}
+
+"L"?{QUOTE}({STRCHAR}|{ESCAPE})*{BACKSL}? {
+   throw cal::CalParser::syntax_error (loc, "unterminated string literal");
+}
+
+  /* character literal */
+"L"?{TICK}({CCCHAR}|{ESCAPE})*{TICK}   {
+    std::string value = std::string(yytext);
+    return cal::CalParser::make_CHAR (value.at(1), loc);
+}
+
+
+  /* Line comment */
+  /* we don't match the \n because that way this works at EOF */
+"//"{NOTNL}*    {
+    /* line comment do nothing */
+}
+
+
+ /* Block comment */
+"/""*"([^*]|"*"*[^*/])*"*"+"/"     {
+  // the pattern is a little complicated because the naive one,
+  //   "/""*"([^*]|"*"[^/])*"*/"
+  // fails to match e.g. "/***/"
+
+}
+
+  /* unterminated block comment */
+"/""*"([^*]|"*"*[^*/])*"*"*        {
+    throw cal::CalParser::syntax_error (loc, "unterminated /""*...*""/ comment");
+}
+
+[ \t\n\f\v\r]+  {
+  /* whitespace do nothing */
+}
+
 .          {
              throw cal::CalParser::syntax_error
                (loc, "invalid character: " + std::string(yytext));
@@ -227,14 +381,25 @@ blank [ \t\r]
 %%
 
 cal::CalParser::symbol_type
-make_NUMBER (const std::string &s, const cal::CalParser::location_type& loc)
+make_LONG (const std::string &s, const cal::CalParser::location_type& loc, int base)
 {
   errno = 0;
-  long n = strtol (s.c_str(), NULL, 10);
-  if (! (INT_MIN <= n && n <= INT_MAX && errno != ERANGE))
+  long n = std::stoul (s,  0, base);
+  if (! (LONG_MIN <= n && n <= LONG_MAX && errno != ERANGE))
     throw cal::CalParser::syntax_error (loc, "integer is out of range: " + s);
-  return cal::CalParser::make_NUMBER ((int) n, loc);
+  return cal::CalParser::make_LONG (n, loc);
 }
+
+cal::CalParser::symbol_type
+make_DOUBLE (const std::string &s, const cal::CalParser::location_type& loc)
+{
+  errno = 0;
+  double n = std::stoul (s,  0);
+  if (! (DBL_MIN <= n && n <= DBL_MAX && errno != ERANGE))
+    throw cal::CalParser::syntax_error (loc, "double is out of range: " + s);
+  return cal::CalParser::make_REAL (n, loc);
+}
+
 
 void
 driver::scan_begin ()
