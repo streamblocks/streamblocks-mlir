@@ -1,5 +1,9 @@
 namespace toto:
 
-int(type:int, c=20)
-
+    function toto (int a, int b) --> int
+    var
+        int x
+    :
+        5
+    end
 end

@@ -23,6 +23,7 @@
 #include "location.hh"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 
 #include "QID.h"
@@ -31,12 +32,128 @@ using Location = cal::location;
 
 namespace cal {
 
-class Expression;
-class TypeExpr;
 class GeneratorVarDecl;
-class Decl;
 class Pattern;
 class Entity;
+
+class Expression {
+public:
+  enum ExpressionKind {
+    Expr_Literal_Long,
+    Expr_Literal_Real,
+    Expr_Literal_Char,
+    Expr_Literal_String,
+    Expr_Literal_Bool,
+    Expr_Literal_Null,
+    Expr_Variable,
+    Expr_Unary,
+    Expr_Binary,
+    Expr_Application,
+    Expr_If,
+    Expr_Indexer,
+    Expr_Lambda,
+    Expr_Let,
+    Expr_List,
+    Expr_Set,
+    Expr_Tuple,
+    Expr_TypeAssertion,
+    Expr_TypeConstruction,
+    Expr_Case
+  };
+  Expression(ExpressionKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~Expression() = default;
+
+  virtual std::unique_ptr<Expression> clone() const = 0;
+
+  ExpressionKind getKind() const { return kind; }
+
+  const Location &loc() const { return location; }
+
+private:
+  const ExpressionKind kind;
+  Location location;
+};
+
+class Decl {
+public:
+  enum DeclKind {
+    Decl_Type,
+    Decl_Global_Type,
+    Decl_Global_Type_Alias,
+    Decl_Global_Type_Sum,
+    Decl_Global_Type_Product,
+    Decl_Parameter_Type,
+    Decl_Var,
+    Decl_Field,
+    Decl_Generator_Var,
+    Decl_Global_Var,
+    Decl_Input_Var,
+    Decl_Local_Var,
+    Decl_Parameter_Var,
+    Decl_Pattern_Var,
+    Decl_Port,
+    Decl_Variant,
+    Decl_Global_Entity
+  };
+
+  Decl(DeclKind kind, Location location, std::string name)
+      : kind(kind), location(location), name(name) {}
+  virtual ~Decl() = default;
+
+  virtual std::unique_ptr<Decl> clone() const = 0;
+
+  DeclKind getKind() const { return kind; }
+  const Location &loc() const { return location; }
+  llvm::StringRef getName() const { return name; }
+
+private:
+  const DeclKind kind;
+  Location location;
+  std::string name;
+};
+
+class TypeExpr {
+public:
+  enum TypeExprKind {
+    TypeExpr_Nominal,
+    TypeExpr_Function,
+    TypeExpr_Procedure,
+    TypeExpr_Tuple,
+    TypeExpr_Union
+  };
+  TypeExpr(TypeExprKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~TypeExpr() = default;
+
+  virtual std::unique_ptr<TypeExpr> clone() const = 0;
+
+  TypeExprKind getKind() const { return kind; }
+
+  const Location &loc() const { return location; }
+
+private:
+  const TypeExprKind kind;
+  Location location;
+};
+
+class Parameter {
+public:
+  enum ParameterKind { Param_Type, Param_Value };
+  Parameter(ParameterKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~Parameter() = default;
+
+  virtual std::unique_ptr<Parameter> clone() const = 0;
+
+  ParameterKind getKind() const { return kind; }
+
+  const Location &loc() const { return location; }
+
+private:
+  const ParameterKind kind;
+  Location location;
+};
 
 class AnnotationParameter {
 public:
@@ -143,21 +260,6 @@ private:
 };
 
 /// Base class for all type parameters nodes.
-class Parameter {
-public:
-  enum ParameterKind { Param_Type, Param_Value };
-  Parameter(ParameterKind kind, Location location)
-      : kind(kind), location(location) {}
-  virtual ~Parameter() = default;
-
-  ParameterKind getKind() const { return kind; }
-
-  const Location &loc() { return location; }
-
-private:
-  const ParameterKind kind;
-  Location location;
-};
 
 class TypeParameter : public Parameter {
 public:
@@ -170,6 +272,10 @@ public:
   /// LLVM style RTTI
   static bool classof(const Parameter *c) { return c->getKind() == Param_Type; }
 
+  std::unique_ptr<Parameter> clone() const override {
+    return std::make_unique<TypeParameter>(loc(), name, value->clone());
+  }
+
 private:
   std::string name;
   std::unique_ptr<TypeExpr> value;
@@ -180,6 +286,11 @@ public:
   ValueParameter(Location loc, std::string name,
                  std::unique_ptr<Expression> value)
       : Parameter(Param_Value, loc), name(name), value(std::move(value)) {}
+
+  std::unique_ptr<Parameter> clone() const override {
+    return std::make_unique<ValueParameter>(loc(), name, value->clone());
+  }
+
   llvm::StringRef getName() { return name; }
   Expression *getValue() { return value.get(); }
 
@@ -193,54 +304,23 @@ private:
   std::unique_ptr<Expression> value;
 };
 
-/// Base class for all declaration nodes.
-class Decl {
-public:
-  enum DeclKind {
-    Decl_Type,
-    Decl_Global_Type,
-    Decl_Global_Type_Alias,
-    Decl_Global_Type_Sum,
-    Decl_Global_Type_Product,
-    Decl_Parameter_Type,
-    Decl_Var,
-    Decl_Field,
-    Decl_Generator_Var,
-    Decl_Global_Var,
-    Decl_Input_Var,
-    Decl_Local_Var,
-    Decl_Parameter_Var,
-    Decl_Pattern_Var,
-    Decl_Port,
-    Decl_Variant,
-    Decl_Global_Entity
-  };
-
-  Decl(DeclKind kind, Location location, std::string name)
-      : kind(kind), location(location), name(name) {}
-  virtual ~Decl() = default;
-
-  DeclKind getKind() const { return kind; }
-  const Location &loc() { return location; }
-  llvm::StringRef getName() { return name; }
-
-private:
-  const DeclKind kind;
-  Location location;
-  std::string name;
-};
+/// classes for all declaration nodes.
 
 enum Availability { PUBLIC, PRIVATE, LOCAL };
 
 class GlobalDecl {
 public:
-  virtual Availability getAvailability() = 0;
+  virtual Availability getAvailability() const = 0;
 };
 
 class TypeDecl : public Decl {
 public:
   TypeDecl(Location location, std::string name)
       : Decl(Decl_Type, location, name) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<TypeDecl>(loc(), llvm::Twine(getName()).str());
+  }
 
   static bool classof(const Parameter *c) {
     return c->getKind() >= Decl_Type && c->getKind() <= Decl_Parameter_Type;
@@ -253,7 +333,12 @@ public:
                  const Availability availability)
       : TypeDecl(location, name), availability(availability) {}
 
-  Availability getAvailability() override { return availability; }
+  Availability getAvailability() const override { return availability; }
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<GlobalTypeDecl>(loc(), llvm::Twine(getName()).str(),
+                                            getAvailability());
+  }
 
 private:
   const Availability availability;
@@ -267,6 +352,10 @@ public:
 
   TypeExpr *getType() { return type.get(); }
 
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
+
 private:
   std::unique_ptr<TypeExpr> type;
 };
@@ -279,8 +368,12 @@ public:
       : Decl(Decl_Global_Entity, location, name), entity(std::move(entity)),
         availability(availability), external(external) {}
 
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
+
   Entity *getEntity() { return entity.get(); }
-  Availability getAvailability() override { return availability; }
+  Availability getAvailability() const override { return availability; }
   bool getExternal() const { return external; }
 
   static bool classof(const Decl *c) {
@@ -297,6 +390,10 @@ class ParameterTypeDecl : public TypeDecl {
 public:
   ParameterTypeDecl(Location location, std::string name)
       : TypeDecl(location, name) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 };
 
 class VarDecl : public Decl {
@@ -305,6 +402,10 @@ public:
           std::unique_ptr<Expression> value, bool constant, bool external)
       : Decl(Decl_Var, location, name), type(std::move(type)),
         value(std::move(value)), constant(constant), external(external) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 
   TypeExpr *getType() const { return type.get(); }
   Expression *getValue() { return value.get(); }
@@ -315,7 +416,7 @@ public:
     return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
   }
 
-private:
+protected:
   std::unique_ptr<TypeExpr> type;
   std::unique_ptr<Expression> value;
   const bool constant;
@@ -328,12 +429,19 @@ public:
             std::unique_ptr<Expression> value)
       : VarDecl(location, name, std::move(type), std::move(value), false,
                 false) {}
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 };
 
 class GeneratorVarDecl : public VarDecl {
 public:
   GeneratorVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 };
 
 class GlobalVarDecl : public VarDecl, GlobalDecl {
@@ -346,7 +454,11 @@ public:
                 external),
         availability(availability) {}
 
-  Availability getAvailability() override { return availability; }
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
+
+  Availability getAvailability() const override { return availability; }
 
 private:
   const Availability availability;
@@ -365,6 +477,10 @@ public:
                std::unique_ptr<Expression> value, bool constant)
       : VarDecl(location, name, std::move(type), std::move(value), constant,
                 false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 };
 
 class ParameterVarDecl : public VarDecl {
@@ -374,11 +490,21 @@ public:
                    std::unique_ptr<Expression> value)
       : VarDecl(location, name, std::move(type), std::move(value), false,
                 false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<ParameterVarDecl>(
+        loc(), llvm::Twine(getName()).str(), std::move(type->clone()),
+        std::move(value->clone()));
+  }
 };
 
 class PatternVarDecl : public VarDecl {
   PatternVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 };
 
 class PortDecl : public Decl {
@@ -386,6 +512,10 @@ class PortDecl : public Decl {
 public:
   PortDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type)
       : Decl(Decl_Port, location, name), type(std::move(type)) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 
 private:
   TypeExpr *getType() { return type.get(); }
@@ -403,6 +533,9 @@ public:
               std::vector<std::unique_ptr<FieldDecl>> fields)
       : Decl(Decl_Variant, location, name), fields(std::move(fields)) {}
 
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
   /// LLVM style RTTI
   static bool classof(const Decl *c) { return c->getKind() == Decl_Variant; }
 
@@ -430,6 +563,10 @@ public:
         typeParameters(std::move(typeParameters)),
         valueParameters(std::move(valueParameters)),
         variants(std::move(variants)) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
+  }
 
   llvm::ArrayRef<std::unique_ptr<ParameterTypeDecl>>
   getTypeParameters() override {
@@ -460,6 +597,10 @@ public:
       : GlobalTypeDecl(location, name, availability),
         typeParameters(std::move(typeParameters)),
         valueParameters(std::move(valueParameters)), fields(std::move(fields)) {
+  }
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::unique_ptr<Decl>();
   }
 
   llvm::ArrayRef<std::unique_ptr<ParameterTypeDecl>>
@@ -521,28 +662,7 @@ private:
   std::unique_ptr<QID> globalName;
 };
 
-/// Base class for all type TypeExpr nodes.
-class TypeExpr {
-public:
-  enum TypeExprKind {
-    TypeExpr_Nominal,
-    TypeExpr_Function,
-    TypeExpr_Procedure,
-    TypeExpr_Tuple,
-    TypeExpr_Union
-  };
-  TypeExpr(TypeExprKind kind, Location location)
-      : kind(kind), location(location) {}
-  virtual ~TypeExpr() = default;
-
-  TypeExprKind getKind() const { return kind; }
-
-  const Location &loc() { return location; }
-
-private:
-  const TypeExprKind kind;
-  Location location;
-};
+/// classes for all type TypeExpr nodes.
 
 class NominalTypeExpr : public TypeExpr {
 public:
@@ -552,6 +672,27 @@ public:
       : TypeExpr(TypeExpr_Nominal, loc), name(name),
         parameterType(std::move(parameterType)),
         parameterValue(std::move(parameterValue)) {}
+
+  std::unique_ptr<TypeExpr> clone() const override {
+    std::vector<std::unique_ptr<TypeParameter>> toParameterType;
+    toParameterType.reserve(parameterType.size());
+    for (const auto &e : parameterType) {
+      auto t = std::unique_ptr<cal::TypeParameter>(
+          static_cast<cal::TypeParameter *>(e->clone().release()));
+      toParameterType.push_back(std::move(t));
+    }
+
+    std::vector<std::unique_ptr<ValueParameter>> toParameterValue;
+    toParameterType.reserve(parameterValue.size());
+    for (const auto &e : parameterValue) {
+      auto t = std::unique_ptr<cal::ValueParameter>(
+          static_cast<cal::ValueParameter *>(e->clone().release()));
+      toParameterValue.push_back(std::move(t));
+    }
+
+    return std::make_unique<NominalTypeExpr>(
+        loc(), name, std::move(toParameterType), std::move(toParameterValue));
+  }
 
   llvm::StringRef getName() { return name; }
   llvm::ArrayRef<std::unique_ptr<TypeParameter>> getParameterType() {
@@ -581,6 +722,16 @@ public:
         parameterTypes(std::move(parameterTypes)),
         returnType(std::move(returnType)) {}
 
+  std::unique_ptr<TypeExpr> clone() const override {
+    std::vector<std::unique_ptr<TypeExpr>> to;
+    to.reserve(parameterTypes.size());
+    for (const auto &e : parameterTypes) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<FunctionTypeExpr>(loc(), std::move(to),
+                                              std::move(returnType->clone()));
+  }
+
   llvm::ArrayRef<std::unique_ptr<TypeExpr>> getParameterTypes() {
     return parameterTypes;
   }
@@ -603,6 +754,15 @@ public:
       : TypeExpr(TypeExpr_Procedure, loc),
         parameterTypes(std::move(parameterTypes)) {}
 
+  std::unique_ptr<TypeExpr> clone() const override {
+    std::vector<std::unique_ptr<TypeExpr>> to;
+    to.reserve(parameterTypes.size());
+    for (const auto &e : parameterTypes) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<ProcedureTypeExpr>(loc(), std::move(to));
+  }
+
   llvm::ArrayRef<std::unique_ptr<TypeExpr>> getParameterTypes() {
     return parameterTypes;
   }
@@ -621,6 +781,15 @@ public:
   TupleTypeExpr(Location loc, std::vector<std::unique_ptr<TypeExpr>> types)
       : TypeExpr(TypeExpr_Tuple, loc), types(std::move(types)) {}
 
+  std::unique_ptr<TypeExpr> clone() const override {
+    std::vector<std::unique_ptr<TypeExpr>> to;
+    to.reserve(types.size());
+    for (const auto &e : types) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<TupleTypeExpr>(loc(), std::move(to));
+  }
+
   llvm::ArrayRef<std::unique_ptr<TypeExpr>> getTypes() { return types; }
 
   /// LLVM style RTTI
@@ -634,9 +803,17 @@ private:
 
 class UnionTypeExpr : public TypeExpr {
 public:
-  UnionTypeExpr(TypeExprKind kind, Location location,
-                std::vector<std::unique_ptr<TypeExpr>> types)
+  UnionTypeExpr(Location location, std::vector<std::unique_ptr<TypeExpr>> types)
       : TypeExpr(TypeExpr_Union, location), types(std::move(types)) {}
+
+  std::unique_ptr<TypeExpr> clone() const override {
+    std::vector<std::unique_ptr<TypeExpr>> to;
+    to.reserve(types.size());
+    for (const auto &e : types) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<UnionTypeExpr>(loc(), std::move(to));
+  }
 
   llvm::ArrayRef<std::unique_ptr<TypeExpr>> getTypes() { return types; }
 
@@ -649,47 +826,17 @@ private:
   std::vector<std::unique_ptr<TypeExpr>> types;
 };
 
-/// Base class for all expressions nodes.
-class Expression {
-public:
-  enum ExpressionKind {
-    Expr_Literal_Long,
-    Expr_Literal_Real,
-    Expr_Literal_Char,
-    Expr_Literal_String,
-    Expr_Literal_Bool,
-    Expr_Literal_Null,
-    Expr_Variable,
-    Expr_Unary,
-    Expr_Binary,
-    Expr_Application,
-    Expr_If,
-    Expr_Indexer,
-    Expr_List,
-    Expr_Set,
-    Expr_Tuple,
-    Expr_TypeAssertion,
-    Expr_TypeConstruction,
-    Expr_Case
-  };
-  Expression(ExpressionKind kind, Location location)
-      : kind(kind), location(location) {}
-  virtual ~Expression() = default;
-
-  ExpressionKind getKind() const { return kind; }
-
-  const Location &loc() { return location; }
-
-private:
-  const ExpressionKind kind;
-  Location location;
-};
+/// classes of all expressions nodes.
 
 class ExprLiteralLong : public Expression {
 public:
   ExprLiteralLong(Location loc, const long value)
       : Expression(Expr_Literal_Long, loc), value(value) {}
   long getValue() { return value; }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralLong(*this));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -706,6 +853,10 @@ public:
       : Expression(Expr_Literal_Real, loc), value(value) {}
   double getValue() { return value; }
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralReal(*this));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Literal_Real;
@@ -721,6 +872,10 @@ public:
       : Expression(Expr_Literal_Char, loc), value(value) {}
   char getValue() { return value; }
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralChar(*this));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Literal_Char;
@@ -730,12 +885,15 @@ private:
   const char value;
 };
 
-
 class ExprLiteralString : public Expression {
 public:
   ExprLiteralString(Location loc, std::string value)
       : Expression(Expr_Literal_String, loc), value(value) {}
   llvm::StringRef getValue() { return value; }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralString(*this));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -752,6 +910,10 @@ public:
       : Expression(Expr_Literal_Bool, loc), value(value) {}
   bool getValue() { return value; }
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralBool(*this));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Literal_Bool;
@@ -761,18 +923,18 @@ private:
   const bool value;
 };
 
-
 class ExprLiteralNull : public Expression {
 public:
-  ExprLiteralNull(Location loc)
-      : Expression(Expr_Literal_Bool, loc) {}
+  ExprLiteralNull(Location loc) : Expression(Expr_Literal_Bool, loc) {}
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprLiteralNull(*this));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Literal_Bool;
   }
-
 };
 
 class ExprVariable : public Expression {
@@ -780,6 +942,10 @@ public:
   ExprVariable(Location loc, llvm::StringRef name)
       : Expression(Expr_Variable, loc), name(name) {}
   llvm::StringRef getName() { return name; }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>(new ExprVariable(*this));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -799,6 +965,11 @@ public:
 
   llvm::StringRef getOp() { return op; }
   Expression *getExpression() { return expression.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::make_unique<ExprUnary>(loc(), op,
+                                       std::move(expression->clone()));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -821,6 +992,11 @@ public:
       : Expression(Expr_Binary, loc), op(op), lhs(std::move(lhs)),
         rhs(std::move(rhs)) {}
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::make_unique<ExprBinary>(loc(), op, std::move(lhs->clone()),
+                                        std::move(rhs->clone()));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Binary;
@@ -842,6 +1018,15 @@ public:
   llvm::StringRef getCallee() { return callee; }
   llvm::ArrayRef<std::unique_ptr<Expression>> getArgs() { return args; }
 
+  std::unique_ptr<Expression> clone() const override {
+    std::vector<std::unique_ptr<Expression>> to;
+    to.reserve(args.size());
+    for (const auto &e : args) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<ExprApplication>(loc(), callee, std::move(to));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_Application;
@@ -861,6 +1046,11 @@ public:
 
   Expression *getStructure() { return structure.get(); }
   Expression *getIndex() { return index.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::make_unique<ExprIndexer>(loc(), std::move(structure->clone()),
+                                         std::move(index->clone()));
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -883,6 +1073,12 @@ public:
   Expression *getThen() { return thenExpr.get(); }
   Expression *getElse() { return elseExpr.get(); }
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::make_unique<ExprIf>(loc(), std::move(condition->clone()),
+                                    std::move(thenExpr->clone()),
+                                    std::move(elseExpr->clone()));
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) { return c->getKind() == Expr_If; }
 
@@ -890,6 +1086,64 @@ private:
   std::unique_ptr<Expression> condition;
   std::unique_ptr<Expression> thenExpr;
   std::unique_ptr<Expression> elseExpr;
+};
+
+class ExprLambda : public Expression {
+public:
+  ExprLambda(Location location,
+             std::vector<std::unique_ptr<ParameterVarDecl>> valueParams,
+             std::unique_ptr<Expression> body,
+             std::unique_ptr<TypeExpr> returnTypeExpr)
+      : Expression(Expr_Lambda, location), valueParams(std::move(valueParams)),
+        body(std::move(body)), returnTypeExpr(std::move(returnTypeExpr)) {}
+
+  llvm::ArrayRef<std::unique_ptr<ParameterVarDecl>> getValueParameters() {
+    return valueParams;
+  }
+  Expression *getBody() { return body.get(); }
+  TypeExpr *getReturnTypeExpr() { return returnTypeExpr.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) {
+    return c->getKind() == Expr_Lambda;
+  }
+
+private:
+  std::vector<std::unique_ptr<ParameterVarDecl>> valueParams;
+  std::unique_ptr<Expression> body;
+  std::unique_ptr<TypeExpr> returnTypeExpr;
+};
+
+class ExprLet : public Expression {
+public:
+  ExprLet(Location location, std::vector<std::unique_ptr<TypeDecl>> typeDecls,
+          std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
+          std::unique_ptr<Expression> body)
+      : Expression(Expr_Let, location), typeDecls(std::move(typeDecls)),
+        varDecls(std::move(varDecls)), body(std::move(body)) {}
+
+  llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecls() { return typeDecls; }
+  llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
+    return varDecls;
+  }
+
+  Expression *getBody() { return body.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) { return c->getKind() == Expr_Let; }
+
+private:
+  std::vector<std::unique_ptr<TypeDecl>> typeDecls;
+  std::vector<std::unique_ptr<LocalVarDecl>> varDecls;
+  std::unique_ptr<Expression> body;
 };
 
 class ExprList : public Expression {
@@ -902,6 +1156,15 @@ public:
   /// LLVM style RTTI
   static bool classof(const Expression *c) { return c->getKind() == Expr_List; }
 
+  std::unique_ptr<Expression> clone() const override {
+    std::vector<std::unique_ptr<Expression>> to;
+    to.reserve(elements.size());
+    for (const auto &e : elements) {
+      to.push_back(e->clone());
+    }
+    return std::make_unique<ExprList>(loc(), std::move(to));
+  }
+
 private:
   std::vector<std::unique_ptr<Expression>> elements;
 };
@@ -912,6 +1175,10 @@ public:
       : Expression(Expr_Set, loc), elements(std::move(elements)) {}
 
   llvm::ArrayRef<std::unique_ptr<Expression>> getElements() { return elements; }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) { return c->getKind() == Expr_Set; }
@@ -926,6 +1193,10 @@ public:
       : Expression(Expr_Tuple, loc), elements(std::move(elements)) {}
 
   llvm::ArrayRef<std::unique_ptr<Expression>> getElements() { return elements; }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -944,6 +1215,10 @@ public:
 
   Expression *getExpr() { return expr.get(); }
   TypeExpr *getType() { return type.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
@@ -976,6 +1251,10 @@ public:
 
   llvm::ArrayRef<std::unique_ptr<Expression>> getArguments() { return args; }
 
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
+
   /// LLVM style RTTI
   static bool classof(const Expression *c) {
     return c->getKind() == Expr_TypeConstruction;
@@ -999,6 +1278,10 @@ public:
   Pattern *getPattern() { return pattern.get(); }
   llvm::ArrayRef<std::unique_ptr<Expression>> getGuards() { return guards; }
   Expression *getExpression() { return expression.get(); }
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::unique_ptr<Expression>();
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) { return c->getKind() == Expr_Case; }

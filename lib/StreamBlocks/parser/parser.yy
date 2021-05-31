@@ -200,11 +200,17 @@
 
 %type <std::unique_ptr<cal::Import>> import single_import group_import
 
-%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr
+%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body
 
 %type <std::unique_ptr<cal::Parameter>> parameter_assignment type_parameter value_parameter
 
-%type <std::unique_ptr<cal::TypeExpr>> type nominal_type
+%type <std::unique_ptr<cal::TypeExpr>> type nominal_type tuple_type lambda_type function_type
+
+%type <std::unique_ptr<VarDecl>> simple_local_var_decl variable_var_decl function_var_decl
+
+%type <std::unique_ptr<LocalVarDecl>> block_var_decl
+
+%type <std::unique_ptr<ParameterVarDecl>> formal_value_parameter
 
 %left "||" "or"
 %left "&&" "and"
@@ -241,7 +247,7 @@ qid : simple_qid
 
 /* Namespace */
 
-namespace_decl:  "namespace" qid ":" type "end"
+namespace_decl:  "namespace" qid ":" simple_local_var_decl "end"
               ;
 
 namespace_decl_default : imports
@@ -356,6 +362,18 @@ elsif_expr: "elsif" expr "then" expr elsif_expr {$$ = std::make_unique<ExprIf>(@
 /* Types */
 
 type : nominal_type
+     | tuple_type
+     | lambda_type
+     ;
+
+%nterm <std::vector<std::unique_ptr<cal::TypeExpr>>> types_plus;
+types_plus: type { $$.push_back($1); }
+     | types_plus "," type { $$=$1; $$.push_back($3); }
+     ;
+
+%nterm <std::vector<std::unique_ptr<cal::TypeExpr>>> types;
+types: %empty { /* empty list */ }
+     | types_plus "," type { $$=$1; $$.push_back($3); }
      ;
 
 nominal_type: ID
@@ -385,6 +403,14 @@ nominal_type: ID
               }
             ;
 
+tuple_type: "(" types_plus ")"  {$$ = std::make_unique<TupleTypeExpr>(@$, std::move($2)); }
+          ;
+
+lambda_type: "[" types  "-->" type "]" {$$ = std::make_unique<FunctionTypeExpr>(@$, std::move($2), std::move($4)); }
+           | "[" types  "-->"      "]" {$$ = std::make_unique<ProcedureTypeExpr>(@$, std::move($2)); }
+           ;
+
+
 /* Parameter */
 
 %nterm <std::vector<std::unique_ptr<Parameter>>> parameter_assignments;
@@ -402,6 +428,97 @@ value_parameter: ID "=" expr { $$ = std::make_unique<ValueParameter>(@$, $1, std
 
 type_parameter: "type" ":" type {$$ = std::make_unique<TypeParameter>(@$, "type", std::move($3));}
               | ID     ":" type {$$ = std::make_unique<TypeParameter>(@$, $1,     std::move($3));}
+
+
+/* Variable Declaration */
+
+
+%nterm <std::vector<std::unique_ptr<ParameterVarDecl>>> formal_value_parameters_list;
+formal_value_parameters_list: formal_value_parameter { $$.push_back($1); }
+     | formal_value_parameters_list "," formal_value_parameter { $$=$1; $$.push_back($3); }
+     ;
+
+%nterm <std::vector<std::unique_ptr<ParameterVarDecl>>> formal_value_parameters;
+formal_value_parameters: %empty { /* empty list */ }
+     | formal_value_parameters_list { $$=$1; }
+     ;
+
+formal_value_parameter: variable_var_decl
+                        {
+                            auto t = std::unique_ptr<ParameterVarDecl>(static_cast<ParameterVarDecl*>($1.release()));
+                            $$ = std::move(t);
+                        }
+                       ;
+
+
+%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls_plus;
+block_var_decls_plus: block_var_decl { $$.push_back($1); }
+                    | block_var_decls_plus "," block_var_decl { $$=$1; $$.push_back($3); }
+                    ;
+
+%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls;
+block_var_decls: %empty { /* empty list */ }
+               | block_var_decls_plus{ $$=$1; }
+               ;
+
+block_var_decl: variable_var_decl
+               {
+                    auto t = std::unique_ptr<cal::LocalVarDecl>(static_cast<cal::LocalVarDecl*>($1.release()));
+                    $$ = std::move(t);
+               }
+              ;
+
+
+simple_local_var_decl: variable_var_decl
+                     | function_var_decl
+                     ;
+
+variable_var_decl:      ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move(std::unique_ptr<Expression>()), true, false); }
+                 |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), true, false); }
+                 |      ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), false, false); }
+                 | type ID            { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move(std::unique_ptr<Expression>()), true, false); }
+                 | type ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false); }
+                 | type ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), false, false); }
+                 ;
+
+
+
+function_type: %empty { $$ = std::unique_ptr<TypeExpr>(); }
+             | "-->" type { $$ = std::move($2); }
+             ;
+
+%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> function_var_decls;
+function_var_decls: %empty {$$ = std::vector<std::unique_ptr<LocalVarDecl>>();}
+             | "var" block_var_decls {$$ = $2;}
+
+
+function_body: %empty { $$ = std::unique_ptr<Expression>();}
+             | ":" expr {$$ = $2;}
+
+function_var_decl: "function" ID "(" formal_value_parameters ")" function_type function_var_decls function_body "end"
+                   {
+                        std::unique_ptr<TypeExpr> type = $6;
+                        std::vector<std::unique_ptr<ParameterVarDecl>> parameters = $4;
+
+
+                        std::unique_ptr<TypeExpr> functionReturnType = $6->clone();
+                        std::vector<std::unique_ptr<TypeExpr>> typeParams;
+                        typeParams.reserve(parameters.size());
+                        // -- TODO
+                        for (const auto &e : parameters) {
+
+                        }
+
+                        std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@$, std::vector<std::unique_ptr<TypeDecl>>(), std::move($7), std::move($8));
+                        auto lambdaExpr = std::make_unique<ExprLambda>(@$, std::move(parameters), std::move(letExpr), std::move(type));
+
+                        std::unique_ptr<FunctionTypeExpr> functionTypeExpr = std::make_unique<FunctionTypeExpr>(@6, std::move(typeParams), std::move(functionReturnType));
+
+                        $$ = std::make_unique<VarDecl>(@$, $2, std::move(functionTypeExpr), std::move(lambdaExpr), true, false);
+                   }
+                 ;
+
+
 
 %%
 

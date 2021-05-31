@@ -247,7 +247,7 @@ blank [ \t\r]
 ".." { return cal::CalParser::make_DOT_DOT(loc); }
 "==>" { return cal::CalParser::make_EQUALS_EQUALS_GT(loc); }
 "{" { return cal::CalParser::make_LBRACE(loc); }
-"[" { return cal::CalParser::make_RBRACE(loc); }
+"[" { return cal::CalParser::make_LBRACK(loc); }
 "(" { return cal::CalParser::make_LPAR(loc); }
 "}" { return cal::CalParser::make_RBRACE(loc); }
 "]" { return cal::CalParser::make_RBRACK(loc); }

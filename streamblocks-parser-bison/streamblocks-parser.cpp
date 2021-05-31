@@ -7,6 +7,17 @@
 int
 main (int argc, char *argv[])
 {
+  cal::location loc;
+  std::vector<std::unique_ptr<cal::TypeExpr>> fTypeParams;
+  //std::unique_ptr<cal::TypeExpr> functionReturnType = std::make_unique<cal::NominalTypeExpr>(loc, "int", );
+
+  std::unique_ptr<cal::Expression> a = std::make_unique<cal::ExprVariable>(loc, "titi");
+
+
+  std::unique_ptr<cal::Expression> cc = a->clone();
+
+
+
   int res = 0;
   driver drv;
   for (int i = 1; i < argc; ++i)
