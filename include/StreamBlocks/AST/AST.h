@@ -493,6 +493,10 @@ public:
       : VarDecl(location, name, std::move(type), std::move(value), constant,
                 false) {}
 
+  LocalVarDecl(std::unique_ptr<VarDecl> decl, bool external)
+    : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(), std::move(decl->getType()->clone()),
+              std::move(decl->getValue()->clone()), decl->getConstant(), external) {}
+
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<LocalVarDecl>(loc(), llvm::Twine(getName()).str(),
                                           std::move(type->clone()),
@@ -521,7 +525,8 @@ public:
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<PatternVarDecl>(loc(), llvm::Twine(getName()).str());
+    return std::make_unique<PatternVarDecl>(loc(),
+                                            llvm::Twine(getName()).str());
   }
 };
 

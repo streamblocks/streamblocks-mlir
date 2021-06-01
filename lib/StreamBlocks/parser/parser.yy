@@ -206,9 +206,9 @@
 
 %type <std::unique_ptr<cal::TypeExpr>> type nominal_type tuple_type lambda_type function_type
 
-%type <std::unique_ptr<VarDecl>> simple_local_var_decl variable_var_decl function_var_decl
+%type <std::unique_ptr<VarDecl>> simple_var_decl variable_var_decl function_var_decl
 
-%type <std::unique_ptr<LocalVarDecl>> block_var_decl
+%type <std::unique_ptr<LocalVarDecl>> local_var_decl block_var_decl
 
 %type <std::unique_ptr<ParameterVarDecl>> formal_value_parameter
 
@@ -250,7 +250,7 @@ qid : simple_qid
 
 /* Namespace */
 
-namespace_decl:  "namespace" qid ":" simple_local_var_decl "end"
+namespace_decl:  "namespace" qid ":" simple_var_decl "end"
               ;
 
 namespace_decl_default : imports
@@ -286,15 +286,15 @@ import: "import" single_import  ";" { $$ = $2; }
 %nterm <std::vector<std::unique_ptr<cal::Import>>> imports;
 imports: %empty {/* empty */}
        | imports import { $$=$1; $$.push_back($2); }
-
+       ;
 
 
 /* Expression */
 
 expr: var_expr
     | literal_expr
-    | binary_expr
     | unary_expr
+    | binary_expr
     | tuple_expr
     | "(" expr ")" {$$ = $2;}
     | if_expr
@@ -368,11 +368,15 @@ let_expr: "let" block_var_decls ":" expr "end" { $$ = std::make_unique<ExprLet>(
         ;
 lambda_expr: "lambda" "(" formal_value_parameters ")" function_type function_var_decls function_body "end"
              {
+                auto returnType = $5;
+                auto formal_parameters = $3;
+                auto vars = $6;
+                std::unique_ptr<Expression> body = $7;
                 if($6.empty()){
-                    $$ = std::make_unique<ExprLambda>(@$, std::move($3), std::move($7), std::move($5));
+                    $$ = std::make_unique<ExprLambda>(@$, std::move(formal_parameters), std::move(body), std::move(returnType));
                 } else {
-                    std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@6, std::vector<std::unique_ptr<TypeDecl>>(), std::move($6), std::move($7));
-                    $$ = std::make_unique<ExprLambda>(@$, std::move($3), std::move(letExpr), std::move($5));
+                    std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@6, std::vector<std::unique_ptr<TypeDecl>>(), std::move(vars), std::move(body));
+                    $$ = std::make_unique<ExprLambda>(@$, std::move(formal_parameters), std::move(letExpr), std::move(returnType));
                 }
              }
            ;
@@ -487,9 +491,14 @@ block_var_decl: variable_var_decl
               ;
 
 
-simple_local_var_decl: variable_var_decl
-                     | function_var_decl
-                     ;
+local_var_decl: "external" simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($2), true); }
+              |            simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($1), false); }
+              ;
+
+
+simple_var_decl: variable_var_decl ;
+               | function_var_decl
+               ;
 
 variable_var_decl:      ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move(std::unique_ptr<Expression>()), true, false); }
                  |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), true, false); }
