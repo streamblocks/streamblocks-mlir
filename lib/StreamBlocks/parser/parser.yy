@@ -200,7 +200,7 @@
 
 %type <std::unique_ptr<cal::Import>> import single_import group_import
 
-%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body
+%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr lambda_expr
 
 %type <std::unique_ptr<cal::Parameter>> parameter_assignment type_parameter value_parameter
 
@@ -223,6 +223,9 @@
 %left "-" "+"
 %left "div" "%" "mod" "*" "/"
 %left "**"
+
+%nonassoc "if"
+%nonassoc "else"
 
 %%
 %start unit;
@@ -295,6 +298,8 @@ expr: var_expr
     | tuple_expr
     | "(" expr ")" {$$ = $2;}
     | if_expr
+    | let_expr
+    | lambda_expr
     ;
 
 var_expr : ID { $$ = std::make_unique<cal::ExprVariable>(@$, $1); }
@@ -358,6 +363,19 @@ if_expr: "if" expr "then" expr elsif_expr "end" {$$ = std::make_unique<ExprIf>(@
 elsif_expr: "elsif" expr "then" expr elsif_expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($5)); }
           | "elsif" expr "then" expr "else" expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($6)); }
           ;
+
+let_expr: "let" block_var_decls ":" expr "end" { $$ = std::make_unique<ExprLet>(@$,std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));  }
+        ;
+lambda_expr: "lambda" "(" formal_value_parameters ")" function_type function_var_decls function_body "end"
+             {
+                if($6.empty()){
+                    $$ = std::make_unique<ExprLambda>(@$, std::move($3), std::move($7), std::move($5));
+                } else {
+                    std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@6, std::vector<std::unique_ptr<TypeDecl>>(), std::move($6), std::move($7));
+                    $$ = std::make_unique<ExprLambda>(@$, std::move($3), std::move(letExpr), std::move($5));
+                }
+             }
+           ;
 
 /* Types */
 

@@ -1,9 +1,12 @@
 namespace toto:
-
+/*
     function toto (int a, int b) --> int
     var
         int x
     :
         5
     end
+*/
+    int a = lambda (int a, int b) --> int : a + b end
+
 end
