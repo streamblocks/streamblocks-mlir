@@ -463,6 +463,14 @@ public:
                 external),
         availability(availability) {}
 
+  GlobalVarDecl(std::unique_ptr<VarDecl> decl, bool external,
+                Availability availability)
+      : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(),
+                std::move(decl->getType()->clone()),
+                std::move(decl->getValue()->clone()), decl->getConstant(),
+                external),
+        availability(availability) {}
+
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<GlobalVarDecl>(
         loc(), llvm::Twine(getName()).str(), std::move(type->clone()),
@@ -494,8 +502,10 @@ public:
                 false) {}
 
   LocalVarDecl(std::unique_ptr<VarDecl> decl, bool external)
-    : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(), std::move(decl->getType()->clone()),
-              std::move(decl->getValue()->clone()), decl->getConstant(), external) {}
+      : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(),
+                std::move(decl->getType()->clone()),
+                std::move(decl->getValue()->clone()), decl->getConstant(),
+                external) {}
 
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<LocalVarDecl>(loc(), llvm::Twine(getName()).str(),

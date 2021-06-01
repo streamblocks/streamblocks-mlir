@@ -202,13 +202,19 @@
 
 %type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr lambda_expr
 
+%type <std::string> unary_op
+
 %type <std::unique_ptr<cal::Parameter>> parameter_assignment type_parameter value_parameter
 
 %type <std::unique_ptr<cal::TypeExpr>> type nominal_type tuple_type lambda_type function_type
 
+%type <Availability> availability
+
 %type <std::unique_ptr<VarDecl>> simple_var_decl variable_var_decl function_var_decl
 
 %type <std::unique_ptr<LocalVarDecl>> local_var_decl block_var_decl
+
+%type <std::unique_ptr<GlobalVarDecl>> global_var_decl
 
 %type <std::unique_ptr<ParameterVarDecl>> formal_value_parameter
 
@@ -230,7 +236,7 @@
 %%
 %start unit;
 
-unit: %empty
+unit: %empty  /* empty */
     | namespace_decl_default
     | namespace_decl
     ;
@@ -250,10 +256,10 @@ qid : simple_qid
 
 /* Namespace */
 
-namespace_decl:  "namespace" qid ":" simple_var_decl "end"
+namespace_decl: "namespace" qid ":" namespace_decl_default "end"
               ;
 
-namespace_decl_default : imports
+namespace_decl_default : imports global_var_decls
                        ;
 
 
@@ -340,13 +346,12 @@ binary_expr : expr "||"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, s
             | expr "**"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
             ;
 
-unary_expr: "not" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
-          | "~"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
-          | "#"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
-          | "dom" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
-          | "rng" expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
-          | "-"   expr { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+unary_op: "not" | "~" | "#" | "dom" | "rng" | "-"
+        ;
+
+unary_expr: unary_op expr %prec "*" { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
           ;
+
 
 
 tuple_expr: "(" tuple_expr_list ")" { $$ = std::make_unique<cal::ExprTuple>(@$, std::move($2)); }
@@ -372,7 +377,7 @@ lambda_expr: "lambda" "(" formal_value_parameters ")" function_type function_var
                 auto formal_parameters = $3;
                 auto vars = $6;
                 std::unique_ptr<Expression> body = $7;
-                if($6.empty()){
+                if(vars.empty()){
                     $$ = std::make_unique<ExprLambda>(@$, std::move(formal_parameters), std::move(body), std::move(returnType));
                 } else {
                     std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@6, std::vector<std::unique_ptr<TypeDecl>>(), std::move(vars), std::move(body));
@@ -455,6 +460,7 @@ type_parameter: "type" ":" type {$$ = std::make_unique<TypeParameter>(@$, "type"
 /* Variable Declaration */
 
 
+
 %nterm <std::vector<std::unique_ptr<ParameterVarDecl>>> formal_value_parameters_list;
 formal_value_parameters_list: formal_value_parameter { $$.push_back($1); }
      | formal_value_parameters_list "," formal_value_parameter { $$=$1; $$.push_back($3); }
@@ -472,6 +478,12 @@ formal_value_parameter: variable_var_decl
                         }
                        ;
 
+availability: %empty {$$ = Availability::PUBLIC; }
+            | "public" {$$ = Availability::PUBLIC; }
+            | "private" {$$ = Availability::PRIVATE; }
+            | "local" {$$ = Availability::LOCAL; }
+            ;
+
 
 %nterm <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls_plus;
 block_var_decls_plus: block_var_decl { $$.push_back($1); }
@@ -484,28 +496,58 @@ block_var_decls: %empty { /* empty list */ }
                ;
 
 block_var_decl: variable_var_decl
-               {
+                {
                     auto t = std::unique_ptr<cal::LocalVarDecl>(static_cast<cal::LocalVarDecl*>($1.release()));
                     $$ = std::move(t);
-               }
+                }
+              | function_var_decl
+                {
+                    auto t = std::unique_ptr<cal::LocalVarDecl>(static_cast<cal::LocalVarDecl*>($1.release()));
+                    $$ = std::move(t);
+                }
               ;
 
+
+%nterm <std::vector<std::unique_ptr<GlobalVarDecl>>> global_var_decls_plus;
+global_var_decls_plus: global_var_decl { $$.push_back($1); }
+                     | global_var_decls_plus "," global_var_decl { $$=$1; $$.push_back($3); }
+                     ;
+
+%nterm <std::vector<std::unique_ptr<GlobalVarDecl>>> global_var_decls;
+global_var_decls: %empty { /* empty list */ }
+                | global_var_decls_plus{ $$=$1; }
+                ;
+
+global_var_decl: availability "external" simple_var_decl  { $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1); }
+               | availability            simple_var_decl  { $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1); }
+               ;
+
+
+%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> local_var_decls_plus;
+local_var_decls_plus: local_var_decl { $$.push_back($1); }
+                     | local_var_decls_plus "," local_var_decl { $$=$1; $$.push_back($3); }
+                     ;
+
+%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> local_var_decls;
+local_var_decls: %empty { /* empty list */ }
+                | local_var_decls_plus{ $$=$1; }
+                ;
 
 local_var_decl: "external" simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($2), true); }
               |            simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($1), false); }
               ;
 
 
-simple_var_decl: variable_var_decl ;
+simple_var_decl: variable_var_decl ";"
                | function_var_decl
                ;
 
 variable_var_decl:      ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move(std::unique_ptr<Expression>()), true, false); }
-                 |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), true, false); }
                  |      ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), false, false); }
+                 |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), true, false); }
                  | type ID            { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move(std::unique_ptr<Expression>()), true, false); }
-                 | type ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false); }
                  | type ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), false, false); }
+                 | type ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false); }
                  ;
 
 

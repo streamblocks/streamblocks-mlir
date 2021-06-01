@@ -165,7 +165,7 @@ blank [ \t\r]
 %}
 
 {blank}+   loc.step ();
-\n+        loc.lines (yyleng); loc.step ();
+{NL}+        loc.lines (yyleng); loc.step ();
 
 
 
