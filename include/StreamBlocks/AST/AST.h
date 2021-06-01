@@ -353,7 +353,9 @@ public:
   TypeExpr *getType() { return type.get(); }
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<AliasTypeDecl>(loc(), llvm::Twine(getName()).str(),
+                                           getAvailability(),
+                                           std::move(type->clone()));
   }
 
 private:
@@ -369,6 +371,7 @@ public:
         availability(availability), external(external) {}
 
   std::unique_ptr<Decl> clone() const override {
+    // TODO : implement
     return std::unique_ptr<Decl>();
   }
 
@@ -392,7 +395,8 @@ public:
       : TypeDecl(location, name) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<ParameterTypeDecl>(loc(),
+                                               llvm::Twine(getName()).str());
   }
 };
 
@@ -404,7 +408,9 @@ public:
         value(std::move(value)), constant(constant), external(external) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<VarDecl>(
+        loc(), llvm::Twine(getName()).str(), std::move(type->clone()),
+        std::move(value->clone()), constant, external);
   }
 
   TypeExpr *getType() const { return type.get(); }
@@ -430,7 +436,9 @@ public:
       : VarDecl(location, name, std::move(type), std::move(value), false,
                 false) {}
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<FieldDecl>(loc(), llvm::Twine(getName()).str(),
+                                       std::move(type->clone()),
+                                       std::move(value->clone()));
   }
 };
 
@@ -440,7 +448,8 @@ public:
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<GeneratorVarDecl>(loc(),
+                                              llvm::Twine(getName()).str());
   }
 };
 
@@ -455,7 +464,9 @@ public:
         availability(availability) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<GlobalVarDecl>(
+        loc(), llvm::Twine(getName()).str(), std::move(type->clone()),
+        std::move(value->clone()), constant, external, availability);
   }
 
   Availability getAvailability() const override { return availability; }
@@ -468,6 +479,10 @@ class InputVarDecl : public VarDecl {
 public:
   InputVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<InputVarDecl>(loc(), llvm::Twine(getName()).str());
+  }
 };
 
 class LocalVarDecl : public VarDecl {
@@ -479,7 +494,9 @@ public:
                 false) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<LocalVarDecl>(loc(), llvm::Twine(getName()).str(),
+                                          std::move(type->clone()),
+                                          std::move(value->clone()), constant);
   }
 };
 
@@ -499,16 +516,16 @@ public:
 };
 
 class PatternVarDecl : public VarDecl {
+public:
   PatternVarDecl(Location location, std::string name)
       : VarDecl(location, name, nullptr, nullptr, true, false) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::unique_ptr<Decl>();
+    return std::make_unique<PatternVarDecl>(loc(), llvm::Twine(getName()).str());
   }
 };
 
 class PortDecl : public Decl {
-
 public:
   PortDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type)
       : Decl(Decl_Port, location, name), type(std::move(type)) {}
@@ -1104,7 +1121,16 @@ public:
   TypeExpr *getReturnTypeExpr() { return returnTypeExpr.get(); }
 
   std::unique_ptr<Expression> clone() const override {
-    return std::unique_ptr<Expression>();
+    std::vector<std::unique_ptr<ParameterVarDecl>> toValueParams;
+    toValueParams.reserve(valueParams.size());
+    for (const auto &e : valueParams) {
+      auto t = std::unique_ptr<ParameterVarDecl>(
+          static_cast<ParameterVarDecl *>(e->clone().release()));
+      toValueParams.push_back(std::move(t));
+    }
+    return std::make_unique<ExprLambda>(loc(), std::move(toValueParams),
+                                        std::move(body->clone()),
+                                        returnTypeExpr->clone());
   }
 
   /// LLVM style RTTI

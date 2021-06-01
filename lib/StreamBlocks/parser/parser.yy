@@ -500,19 +500,21 @@ function_var_decl: "function" ID "(" formal_value_parameters ")" function_type f
                         std::unique_ptr<TypeExpr> type = $6;
                         std::vector<std::unique_ptr<ParameterVarDecl>> parameters = $4;
 
+                        // Clone function return Type
+                        std::unique_ptr<TypeExpr> functionReturnType = type->clone();
 
-                        std::unique_ptr<TypeExpr> functionReturnType = $6->clone();
-                        std::vector<std::unique_ptr<TypeExpr>> typeParams;
-                        typeParams.reserve(parameters.size());
-                        // -- TODO
+                        // -- Clone parameter Types
+                        std::vector<std::unique_ptr<TypeExpr>> parameterTypes;
+                        parameterTypes.reserve(parameters.size());
                         for (const auto &e : parameters) {
-
+                            std::unique_ptr<cal::TypeExpr> parameterType = e->getType()->clone();
+                            parameterTypes.push_back(std::move(parameterType));
                         }
 
                         std::unique_ptr<Expression> letExpr = std::make_unique<ExprLet>(@$, std::vector<std::unique_ptr<TypeDecl>>(), std::move($7), std::move($8));
                         auto lambdaExpr = std::make_unique<ExprLambda>(@$, std::move(parameters), std::move(letExpr), std::move(type));
 
-                        std::unique_ptr<FunctionTypeExpr> functionTypeExpr = std::make_unique<FunctionTypeExpr>(@6, std::move(typeParams), std::move(functionReturnType));
+                        std::unique_ptr<FunctionTypeExpr> functionTypeExpr = std::make_unique<FunctionTypeExpr>(@6, std::move(parameterTypes), std::move(functionReturnType));
 
                         $$ = std::make_unique<VarDecl>(@$, $2, std::move(functionTypeExpr), std::move(lambdaExpr), true, false);
                    }
