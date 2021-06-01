@@ -308,7 +308,7 @@ blank [ \t\r]
 }
 
 [0][xX] {
-  throw cal::CalParser::syntax_error (loc, "hexadecimal literal with nothing after the 'x'");
+  cal::CalParser::syntax_error (loc, "hexadecimal literal with nothing after the 'x'");
 }
 
  /* Doubles */
@@ -324,7 +324,7 @@ blank [ \t\r]
 {DIGITS}"."{DIGITS}?[eE]{SIGN}?   |
 {DIGITS}"."?[eE]{SIGN}?           |
 "."{DIGITS}[eE]{SIGN}?            {
-  throw cal::CalParser::syntax_error (loc, "real literal with no digits after the 'e'");
+  cal::CalParser::syntax_error (loc, "real literal with no digits after the 'e'");
   /* in recovery rules like this it's best to yield the best-guess
    * token type, instead of some TOK_ERROR, so the parser can still
    * try to make sense of the input; having reported the error is
@@ -339,7 +339,7 @@ blank [ \t\r]
 }
 
 "L"?{QUOTE}({STRCHAR}|{ESCAPE})*{BACKSL}? {
-   throw cal::CalParser::syntax_error (loc, "unterminated string literal");
+   cal::CalParser::syntax_error (loc, "unterminated string literal");
 }
 
   /* character literal */
@@ -366,7 +366,7 @@ blank [ \t\r]
 
   /* unterminated block comment */
 "/""*"([^*]|"*"*[^*/])*"*"*        {
-    throw cal::CalParser::syntax_error (loc, "unterminated /""*...*""/ comment");
+    cal::CalParser::syntax_error (loc, "unterminated /""*...*""/ comment");
 }
 
 [ \t\n\f\v\r]+  {
@@ -374,7 +374,7 @@ blank [ \t\r]
 }
 
 .          {
-             throw cal::CalParser::syntax_error
+             cal::CalParser::syntax_error
                (loc, "invalid character: " + std::string(yytext));
 }
 <<EOF>>    return cal::CalParser::make_EOF (loc);
@@ -386,7 +386,7 @@ make_LONG (const std::string &s, const cal::CalParser::location_type& loc, int b
   errno = 0;
   long n = std::stoul (s,  0, base);
   if (! (LONG_MIN <= n && n <= LONG_MAX && errno != ERANGE))
-    throw cal::CalParser::syntax_error (loc, "integer is out of range: " + s);
+     cal::CalParser::syntax_error (loc, "integer is out of range: " + s);
   return cal::CalParser::make_LONG (n, loc);
 }
 
@@ -396,7 +396,7 @@ make_DOUBLE (const std::string &s, const cal::CalParser::location_type& loc)
   errno = 0;
   double n = std::stoul (s,  0);
   if (! (DBL_MIN <= n && n <= DBL_MAX && errno != ERANGE))
-    throw cal::CalParser::syntax_error (loc, "double is out of range: " + s);
+     cal::CalParser::syntax_error (loc, "double is out of range: " + s);
   return cal::CalParser::make_REAL (n, loc);
 }
 
