@@ -542,10 +542,10 @@ simple_var_decl: variable_var_decl ";"
                | function_var_decl
                ;
 
-variable_var_decl:      ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move(std::unique_ptr<Expression>()), true, false); }
-                 |      ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), false, false); }
-                 |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::move(std::unique_ptr<TypeExpr>()), std::move($3), true, false); }
-                 | type ID            { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move(std::unique_ptr<Expression>()), true, false); }
+variable_var_decl:      ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::unique_ptr<Expression>(), true, false); }
+                 |      ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), false, false); }
+                 |      ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), true, false); }
+                 | type ID            { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::unique_ptr<Expression>(), true, false); }
                  | type ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), false, false); }
                  | type ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false); }
                  ;
