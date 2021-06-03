@@ -310,7 +310,7 @@ enum Availability { PUBLIC, PRIVATE, LOCAL };
 
 class GlobalDecl {
 public:
-  virtual ~GlobalDecl()  = default;
+  virtual ~GlobalDecl() = default;
   virtual Availability getAvailability() const = 0;
 };
 
@@ -408,9 +408,11 @@ public:
         value(std::move(value)), constant(constant), external(external) {}
 
   std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<VarDecl>(loc(), llvm::Twine(getName()).str(),
-                                     type->clone(), value->clone(), constant,
-                                     external);
+    return std::make_unique<VarDecl>(
+        loc(), llvm::Twine(getName()).str(),
+        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
+        value != nullptr ? value->clone() : std::unique_ptr<Expression>(),
+        constant, external);
   }
 
   TypeExpr *getType() const { return type.get(); }
@@ -452,7 +454,7 @@ public:
   }
 };
 
-class GlobalVarDecl : public VarDecl, GlobalDecl {
+class GlobalVarDecl : public VarDecl, public GlobalDecl {
 public:
   GlobalVarDecl(Location location, std::string name,
                 std::unique_ptr<TypeExpr> type,
@@ -465,7 +467,10 @@ public:
   GlobalVarDecl(std::unique_ptr<VarDecl> decl, bool external,
                 Availability availability)
       : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(),
-                decl->getType()->clone(), decl->getValue()->clone(),
+                decl->getType() != nullptr ? decl->getType()->clone()
+                                           : std::unique_ptr<TypeExpr>(),
+                decl->getValue() != nullptr ? decl->getValue()->clone()
+                                            : std::unique_ptr<Expression>(),
                 decl->getConstant(), external),
         availability(availability) {}
 
@@ -521,7 +526,9 @@ public:
 
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<ParameterVarDecl>(
-        loc(), llvm::Twine(getName()).str(), type->clone(), value->clone());
+        loc(), llvm::Twine(getName()).str(),
+        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
+        value != nullptr ? value->clone() : std::unique_ptr<Expression>());
   }
 };
 

@@ -147,7 +147,6 @@ TICK          [\']
 /* space or tab */
 SPTAB         [ \t]
 
-blank [ \t\r]
 
 %{
   // Code run each time a pattern is matched.
@@ -164,7 +163,6 @@ blank [ \t\r]
   loc.step ();
 %}
 
-{blank}+   loc.step ();
 {NL}+        loc.lines (yyleng); loc.step ();
 
 
@@ -204,6 +202,7 @@ blank [ \t\r]
 "endschedule" { return cal::CalParser::make_ENDSCHEDULE(loc); }
 "endwhile" { return cal::CalParser::make_ENDWHILE(loc); }
 "ensure" { return cal::CalParser::make_ENSURE(loc); }
+"external" { return cal::CalParser::make_EXTERNAL(loc); }
 "false" { return cal::CalParser::make_FALSE(loc); }
 "for" { return cal::CalParser::make_FOR(loc); }
 "foreach" { return cal::CalParser::make_FOREACH(loc); }
@@ -214,6 +213,7 @@ blank [ \t\r]
 "import" { return cal::CalParser::make_IMPORT(loc); }
 "initialize" { return cal::CalParser::make_INITIALIZE(loc); }
 "invariant" { return cal::CalParser::make_INVARIANT(loc); }
+"local" { return cal::CalParser::make_LOCAL(loc); }
 "lambda" { return cal::CalParser::make_LAMBDA(loc); }
 "let" { return cal::CalParser::make_LET(loc); }
 "map" { return cal::CalParser::make_MAP(loc); }
@@ -223,6 +223,8 @@ blank [ \t\r]
 "null" { return cal::CalParser::make_NULL(loc); }
 "old" { return cal::CalParser::make_OLD(loc); }
 "package" { return cal::CalParser::make_PACKAGE(loc); }
+"public" { return cal::CalParser::make_PUBLIC(loc); }
+"private" { return cal::CalParser::make_PRIVATE(loc); }
 "priority" { return cal::CalParser::make_PRIORITY(loc); }
 "proc" { return cal::CalParser::make_PROC(loc); }
 "procedure" { return cal::CalParser::make_PROCEDURE(loc); }
@@ -371,6 +373,7 @@ blank [ \t\r]
 
 [ \t\n\f\v\r]+  {
   /* whitespace do nothing */
+  loc.step();
 }
 
 .          {
