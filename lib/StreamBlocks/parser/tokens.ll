@@ -241,6 +241,7 @@ SPTAB         [ \t]
 
 
 ":" { return cal::CalParser::make_COLON(loc); }
+"::" { return cal::CalParser::make_COLON_COLON(loc); }
 ":=" { return cal::CalParser::make_COLON_EQUALS(loc); }
 "," { return cal::CalParser::make_COMMA(loc); }
 "-->" { return cal::CalParser::make_DASH_DASH_GT(loc); }

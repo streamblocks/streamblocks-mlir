@@ -133,6 +133,7 @@
 
 /* -- Delimiters --*/
 %token COLON ":"
+%token COLON_COLON "::"
 %token COLON_EQUALS ":="
 %token COMMA ","
 %token DASH_DASH_GT "-->"
@@ -200,7 +201,7 @@
 
 %type <std::unique_ptr<cal::Import>> import single_import group_import
 
-%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr lambda_expr
+%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr lambda_expr type_assertion_expr
 
 %type <std::string> unary_op
 
@@ -307,6 +308,7 @@ expr: var_expr
     | literal_expr
     | unary_expr
     | binary_expr
+    | type_assertion_expr
     | tuple_expr
     | "(" expr ")" {$$ = $2;}
     | if_expr
@@ -374,6 +376,8 @@ tuple_expr: "("  ")" { $$ = std::make_unique<cal::ExprTuple>(@$, std::vector<std
              $$ = std::make_unique<cal::ExprTuple>(@$, std::move(tuples));
           }
           ;
+type_assertion_expr: "(" expr "::" type ")" { $$ = std::make_unique<cal::ExprTypeAssertion>(@$, std::move($2), std::move($4)); }
+                   ;
 
 opt_comma: %empty
          | ","
@@ -541,9 +545,9 @@ global_var_decls.opt: %empty { /* empty list */ }
                 ;
 
 global_var_decl:                         simple_var_decl {$$ = std::make_unique<GlobalVarDecl>(std::move($1), false,  Availability::PUBLIC);}
-               | availability            simple_var_decl  { $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1); }
                |              "external" simple_var_decl {$$ = std::make_unique<GlobalVarDecl>(std::move($2), true, Availability::PUBLIC);}
-               | availability "external" simple_var_decl  { $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1); }
+               | availability            simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1); }
+               | availability "external" simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1); }
                ;
 
 
