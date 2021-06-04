@@ -139,7 +139,7 @@
 %token DASH_DASH_GT "-->"
 %token DASH_GT "->"
 %token DOT "."
-%token DOT_DOT ".."
+
 %token EQUALS_EQUALS_GT "==>"
 %token LBRACE "{"
 %token LBRACK "["
@@ -158,6 +158,7 @@
 %token <std::string> CARET "^"
 %token <std::string> DIV "div"
 %token <std::string> DOM "dom"
+%token <std::string> DOT_DOT ".."
 %token <std::string> EQUALS "="
 %token <std::string> EQUALS_EQUALS "=="
 %token <std::string> HASH "#"
@@ -225,8 +226,15 @@
 
 %type <std::unique_ptr<ParameterVarDecl>> formal_value_parameter
 
-%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt
+%type <std::unique_ptr<GeneratorVarDecl>> generator_var_decl
 
+%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt
+
+%type <std::unique_ptr<StmtForeach>> foreach_header_stmt
+
+%type <std::vector<std::unique_ptr<Statement>>> foreach_body_stmt
+
+%left ".."
 %left "||" "or"
 %left "&&" "and"
 %left "|"
@@ -343,7 +351,8 @@ literal_expr: LONG    { $$ = std::make_unique<cal::ExprLiteralLong>(@$, $1); }
             | CHAR    { $$ = std::make_unique<cal::ExprLiteralChar>(@$, $1); }
             ;
 
-binary_expr : expr "||"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+binary_expr : expr ".."  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+            | expr "||"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
             | expr "or"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
             | expr "&&"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
             | expr "and" expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
@@ -507,6 +516,7 @@ variable: ID {$$ = std::make_unique<Variable>(@$, $1); }
 field: ID {$$ = std::make_unique<Field>(@$, $1); }
      ;
 
+
 %nterm <std::vector<std::unique_ptr<ParameterVarDecl>>> formal_value_parameters_list;
 formal_value_parameters_list: formal_value_parameter { $$.push_back($1); }
      | formal_value_parameters_list "," formal_value_parameter { $$=$1; $$.push_back($3); }
@@ -584,6 +594,12 @@ local_var_decl: "external" simple_var_decl  { $$ = std::make_unique<LocalVarDecl
               |            simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($1), false); }
               ;
 
+generator_var_decl: ID { $$ = std::make_unique<GeneratorVarDecl>(@$, $1); }
+                  ;
+%nterm <std::vector<std::unique_ptr<GeneratorVarDecl>>> generator_var_decls;
+generator_var_decls: generator_var_decl { $$.push_back($1); }
+                     | generator_var_decls "," generator_var_decl { $$=$1; $$.push_back($3); }
+                     ;
 
 simple_var_decl: variable_var_decl ";"
                | function_var_decl
@@ -661,6 +677,7 @@ stmt: assignment_stmt
     | block_stmt
     | if_stmt
     | while_stmt
+    | foreach_stmt
     ;
 
 %nterm <std::vector<std::unique_ptr<Statement>>> stmts.plus;
@@ -710,6 +727,48 @@ while_stmt: "while" expr "do" stmts "end" { $$ = std::make_unique<StmtWhile>(@$,
             }
           ;
 
+
+foreach_stmt: foreach_header_stmt "end" {$$=std::move($1);}
+            ;
+
+foreach_header_stmt: "foreach" generator_var_decls "in" expr  foreach_body_stmt
+                   {
+                        auto generator = std::make_unique<Generator>(@2, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4));
+                        $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::vector<std::unique_ptr<Expression>>(), std::move($5));
+                   }
+                   | "foreach" type generator_var_decls "in" expr foreach_body_stmt
+                   {
+                        auto generator = std::make_unique<Generator>(@2, std::move($2), std::move($3), std::move($5));
+                        $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::vector<std::unique_ptr<Expression>>(), std::move($6));
+                   }
+                   | "foreach" generator_var_decls "in" expr "," exprs foreach_body_stmt
+                   {
+                       auto generator = std::make_unique<Generator>(@2, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4));
+                       $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::move($6), std::move($7));
+                   }
+                   | "foreach" type generator_var_decls "in" expr "," exprs foreach_body_stmt
+                   {
+                       auto generator = std::make_unique<Generator>(@2, std::move($2), std::move($3), std::move($5));
+                       $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::move($7), std::move($8));
+                   }
+                   ;
+
+
+foreach_body_stmt: "," foreach_header_stmt
+                 {
+                    std::vector<std::unique_ptr<Statement>> stmts;
+                    stmts.push_back(std::move($2));
+                    $$ = std::move(stmts);
+                 }
+                 | "do" stmts { $$ = $2;}
+                 | "var" block_var_decls "do" stmts
+                 {
+                    std::unique_ptr<StmtBlock> body = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));
+                    std::vector<std::unique_ptr<Statement>> stmts;
+                    stmts.push_back(std::move(body));
+                    $$ = std::move(stmts);
+                 }
+                 ;
 
 %%
 

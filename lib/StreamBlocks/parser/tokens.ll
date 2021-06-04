@@ -247,7 +247,6 @@ SPTAB         [ \t]
 "-->" { return cal::CalParser::make_DASH_DASH_GT(loc); }
 "->" { return cal::CalParser::make_DASH_GT(loc); }
 "." { return cal::CalParser::make_DOT(loc); }
-".." { return cal::CalParser::make_DOT_DOT(loc); }
 "==>" { return cal::CalParser::make_EQUALS_EQUALS_GT(loc); }
 "{" { return cal::CalParser::make_LBRACE(loc); }
 "[" { return cal::CalParser::make_LBRACK(loc); }
@@ -266,6 +265,7 @@ SPTAB         [ \t]
 "^"   { return cal::CalParser::make_CARET(yytext, loc); }
 "div" { return cal::CalParser::make_DIV(yytext, loc); }
 "dom" { return cal::CalParser::make_DOM(yytext, loc); }
+".."  { return cal::CalParser::make_DOT_DOT(yytext, loc); }
 "="   { return cal::CalParser::make_EQUALS(yytext, loc); }
 "=="  { return cal::CalParser::make_EQUALS_EQUALS(yytext, loc); }
 "#"   { return cal::CalParser::make_HASH(yytext, loc); }
