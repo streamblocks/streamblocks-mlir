@@ -1,3 +1,14 @@
-import all toto;
-int a = (lambda (int a, int b) --> int : a + b end :: int);
+begin
+var
+    int a = 0,
+    int b
+do
+    while (b < 5)
+    var
+        int x
+    do
 
+        b := b + 1;
+
+    end
+end

@@ -48,6 +48,7 @@ public:
     Expr_Variable,
     Expr_Unary,
     Expr_Binary,
+    Expr_Comprehension,
     Expr_Application,
     Expr_If,
     Expr_Indexer,
@@ -155,6 +156,48 @@ private:
   Location location;
 };
 
+class VarDecl : public Decl {
+public:
+  VarDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
+          std::unique_ptr<Expression> value, bool constant, bool external)
+      : Decl(Decl_Var, location, name), type(std::move(type)),
+        value(std::move(value)), constant(constant), external(external) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<VarDecl>(
+        loc(), llvm::Twine(getName()).str(),
+        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
+        value != nullptr ? value->clone() : std::unique_ptr<Expression>(),
+        constant, external);
+  }
+
+  TypeExpr *getType() const { return type.get(); }
+  Expression *getValue() { return value.get(); }
+  bool getConstant() const { return constant; }
+  bool getExternal() const { return external; }
+
+  static bool classof(const Parameter *c) {
+    return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
+  }
+
+protected:
+  std::unique_ptr<TypeExpr> type;
+  std::unique_ptr<Expression> value;
+  const bool constant;
+  const bool external;
+};
+
+class GeneratorVarDecl : public VarDecl {
+public:
+  GeneratorVarDecl(Location location, std::string name)
+      : VarDecl(location, name, nullptr, nullptr, true, false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<GeneratorVarDecl>(loc(),
+                                              llvm::Twine(getName()).str());
+  }
+};
+
 class AnnotationParameter {
 public:
   AnnotationParameter(Location location, std::string name,
@@ -215,7 +258,19 @@ public:
 
   virtual ~Generator() = default;
 
-  const Location &loc() { return location; }
+  std::unique_ptr<Generator> clone() const {
+    std::vector<std::unique_ptr<GeneratorVarDecl>> tovVarDecls;
+    tovVarDecls.reserve(varDecls.size());
+    for (const auto &e : varDecls) {
+      auto t = std::unique_ptr<GeneratorVarDecl>(
+          static_cast<GeneratorVarDecl *>(e->clone().release()));
+      tovVarDecls.push_back(std::move(t));
+    }
+    return std::make_unique<Generator>(
+        loc(), type->clone(), std::move(tovVarDecls), collection->clone());
+  }
+
+  const Location &loc() const { return location; }
 
   TypeExpr *getType() { return type.get(); }
 
@@ -400,37 +455,6 @@ public:
   }
 };
 
-class VarDecl : public Decl {
-public:
-  VarDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
-          std::unique_ptr<Expression> value, bool constant, bool external)
-      : Decl(Decl_Var, location, name), type(std::move(type)),
-        value(std::move(value)), constant(constant), external(external) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<VarDecl>(
-        loc(), llvm::Twine(getName()).str(),
-        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
-        value != nullptr ? value->clone() : std::unique_ptr<Expression>(),
-        constant, external);
-  }
-
-  TypeExpr *getType() const { return type.get(); }
-  Expression *getValue() { return value.get(); }
-  bool getConstant() const { return constant; }
-  bool getExternal() const { return external; }
-
-  static bool classof(const Parameter *c) {
-    return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
-  }
-
-protected:
-  std::unique_ptr<TypeExpr> type;
-  std::unique_ptr<Expression> value;
-  const bool constant;
-  const bool external;
-};
-
 class FieldDecl : public VarDecl {
 public:
   FieldDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
@@ -440,17 +464,6 @@ public:
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<FieldDecl>(loc(), llvm::Twine(getName()).str(),
                                        type->clone(), value->clone());
-  }
-};
-
-class GeneratorVarDecl : public VarDecl {
-public:
-  GeneratorVarDecl(Location location, std::string name)
-      : VarDecl(location, name, nullptr, nullptr, true, false) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<GeneratorVarDecl>(loc(),
-                                              llvm::Twine(getName()).str());
   }
 };
 
@@ -1041,6 +1054,40 @@ public:
 private:
   std::string op;
   std::unique_ptr<Expression> lhs, rhs;
+};
+
+class ExprComprehension : public Expression {
+public:
+  ExprComprehension(Location location, std::unique_ptr<Generator> generator,
+                    std::vector<std::unique_ptr<Expression>> filters,
+                    std::unique_ptr<Expression> collection)
+      : Expression(Expr_Comprehension, location),
+        generator(std::move(generator)), filters(std::move(filters)),
+        collection(std::move(collection)) {}
+
+  std::unique_ptr<Expression> clone() const override {
+    std::vector<std::unique_ptr<Expression>> toFilters;
+    toFilters.reserve(filters.size());
+    for (const auto &e : filters) {
+      toFilters.push_back(e->clone());
+    }
+    return std::make_unique<ExprComprehension>(
+        loc(), generator->clone(), std::move(toFilters), collection->clone());
+  }
+
+  Generator *getGenerator() { return generator.get(); }
+  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
+  Expression *getCollection() { return collection.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) {
+    return c->getKind() == Expr_Comprehension;
+  }
+
+private:
+  std::unique_ptr<Generator> generator;
+  std::vector<std::unique_ptr<Expression>> filters;
+  std::unique_ptr<Expression> collection;
 };
 
 class ExprApplication : public Expression {
