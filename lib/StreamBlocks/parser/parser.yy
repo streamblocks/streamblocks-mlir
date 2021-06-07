@@ -202,7 +202,7 @@
 
 %type <std::unique_ptr<cal::Import>> import single_import group_import
 
-%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr lambda_expr type_assertion_expr application_expr
+%type <std::unique_ptr<cal::Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr list_comprehension_header_expr list_comprehension_body_expr list_comprehension_expr lambda_expr type_assertion_expr application_expr
 
 %type <std::string> unary_op
 
@@ -234,6 +234,8 @@
 
 %type <std::vector<std::unique_ptr<Statement>>> foreach_body_stmt
 
+%type <std::unique_ptr<Generator>> for_generator
+
 %left ".."
 %left "||" "or"
 %left "&&" "and"
@@ -249,6 +251,8 @@
 
 %nonassoc "if"
 %nonassoc "else"
+
+%nonassoc ","
 
 %%
 %start unit;
@@ -332,8 +336,9 @@ expr: var_expr
     | tuple_expr
     | "(" expr ")" {$$ = $2;}
     | if_expr
-    | let_expr
     | lambda_expr
+    | let_expr
+    | list_comprehension_expr
     ;
 
 var_expr: ID { $$ = std::make_unique<cal::ExprVariable>(@$, $1); }
@@ -420,8 +425,6 @@ elsif_expr: "elsif" expr "then" expr elsif_expr {$$ = std::make_unique<ExprIf>(@
           | "elsif" expr "then" expr "else" expr {$$ = std::make_unique<ExprIf>(@$, std::move($2), std::move($4), std::move($6)); }
           ;
 
-let_expr: "let" block_var_decls ":" expr "end" { $$ = std::make_unique<ExprLet>(@$,std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));  }
-        ;
 lambda_expr: "lambda" "(" formal_value_parameters ")" function_type function_var_decls function_body "end"
              {
                 auto returnType = $5;
@@ -436,6 +439,36 @@ lambda_expr: "lambda" "(" formal_value_parameters ")" function_type function_var
                 }
              }
            ;
+
+let_expr: "let" block_var_decls ":" expr "end" { $$ = std::make_unique<ExprLet>(@$,std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));  }
+        ;
+
+
+list_comprehension_expr: "[" list_expr "]"
+                       | "[" list_comprehension_body_expr "]"
+                       ;
+
+list_expr: exprs  { $$ = make_unique<ExprList>(@$, std::move($1)); }
+         ;
+
+
+
+for_generator: "for" generator_var_decls "in" expr {$$ = std::make_unique<Generator>(@$, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4));}
+             | "for" type generator_var_decls "in" expr {$$ = std::make_unique<Generator>(@$, std::move($2), std::move($3), std::move($5));}
+             ;
+
+
+list_comprehension_header_expr: list_expr ":" for_generator           { $$ = make_unique<ExprComprehension>(@$, std::move($3), std::vector<std::unique_ptr<Expression>>(), std::move($1)); }
+                              | list_expr ":" for_generator "," exprs { $$ = make_unique<ExprComprehension>(@$, std::move($3), std::move($5), std::move($1)); }
+                              ;
+
+list_comprehension_body_expr: list_comprehension_header_expr
+                            | list_comprehension_body_expr "," for_generator { $$ = make_unique<ExprComprehension>(@$, std::move($3), std::vector<std::unique_ptr<Expression>>(), std::move($1)); }
+                            | list_comprehension_body_expr "," for_generator "," exprs { $$ = make_unique<ExprComprehension>(@$, std::move($3), std::move($5), std::move($1)); }
+                            ;
+
+
+
 
 /* Types */
 
