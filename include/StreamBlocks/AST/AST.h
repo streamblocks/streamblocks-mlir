@@ -56,6 +56,7 @@ public:
     Expr_Let,
     Expr_List,
     Expr_Set,
+    Expr_Proc,
     Expr_Tuple,
     Expr_TypeAssertion,
     Expr_TypeConstruction,
@@ -73,6 +74,36 @@ public:
 
 private:
   const ExpressionKind kind;
+  Location location;
+};
+
+/// Base class for all statements nodes.
+class Statement {
+public:
+  enum StatementKind {
+    Stmt_Assignment,
+    Stmt_Block,
+    Stmt_Call,
+    // Stmt_Case,
+    Stmt_Consume,
+    Stmt_Foreach,
+    Stmt_If,
+    Stmt_Read,
+    Stmt_While,
+    Stmt_Write
+  };
+  Statement(StatementKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~Statement() = default;
+
+  virtual std::unique_ptr<Statement> clone() const = 0;
+
+  StatementKind getKind() const { return kind; }
+
+  const Location &loc() { return location; }
+
+private:
+  const StatementKind kind;
   Location location;
 };
 
@@ -252,13 +283,16 @@ class Generator {
 public:
   Generator(Location location, std::unique_ptr<TypeExpr> type,
             std::vector<std::unique_ptr<GeneratorVarDecl>> varDecls,
-            std::unique_ptr<Expression> collection)
+            std::unique_ptr<Expression> collection,
+            std::vector<std::unique_ptr<Expression>> filters)
       : location(location), type(std::move(type)),
-        varDecls(std::move(varDecls)), collection(std::move(collection)) {}
+        varDecls(std::move(varDecls)), collection(std::move(collection)),
+        filters(std::move(filters)) {}
 
   virtual ~Generator() = default;
 
   std::unique_ptr<Generator> clone() const {
+
     std::vector<std::unique_ptr<GeneratorVarDecl>> tovVarDecls;
     tovVarDecls.reserve(varDecls.size());
     for (const auto &e : varDecls) {
@@ -266,8 +300,18 @@ public:
           static_cast<GeneratorVarDecl *>(e->clone().release()));
       tovVarDecls.push_back(std::move(t));
     }
+
+    std::vector<std::unique_ptr<Expression>> toFilters;
+    toFilters.reserve(filters.size());
+    for (const auto &e : filters) {
+      auto t = std::unique_ptr<Expression>(
+          static_cast<Expression *>(e->clone().release()));
+      toFilters.push_back(std::move(t));
+    }
+
     return std::make_unique<Generator>(
-        loc(), type->clone(), std::move(tovVarDecls), collection->clone());
+        loc(), type->clone(), std::move(tovVarDecls), collection->clone(),
+        std::move(toFilters));
   }
 
   const Location &loc() const { return location; }
@@ -280,11 +324,14 @@ public:
 
   Expression *getExpression() { return collection.get(); }
 
+  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
+
 private:
   Location location;
   std::unique_ptr<TypeExpr> type;
   std::vector<std::unique_ptr<GeneratorVarDecl>> varDecls;
   std::unique_ptr<Expression> collection;
+  std::vector<std::unique_ptr<Expression>> filters;
 };
 
 class Port {
@@ -1238,10 +1285,15 @@ private:
 
 class ExprList : public Expression {
 public:
-  ExprList(Location loc, std::vector<std::unique_ptr<Expression>> elements)
-      : Expression(Expr_List, loc), elements(std::move(elements)) {}
+  ExprList(Location loc, std::vector<std::unique_ptr<Expression>> elements,
+           std::vector<std::unique_ptr<Generator>> generators)
+      : Expression(Expr_List, loc), elements(std::move(elements)),
+        generators(std::move(generators)) {}
 
   llvm::ArrayRef<std::unique_ptr<Expression>> getElements() { return elements; }
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
+  }
 
   /// LLVM style RTTI
   static bool classof(const Expression *c) { return c->getKind() == Expr_List; }
@@ -1252,22 +1304,89 @@ public:
     for (const auto &e : elements) {
       to.push_back(e->clone());
     }
-    return std::make_unique<ExprList>(loc(), std::move(to));
+
+    std::vector<std::unique_ptr<Generator>> toGenerator;
+    to.reserve(generators.size());
+    for (const auto &e : generators) {
+      toGenerator.push_back(e->clone());
+    }
+
+    return std::make_unique<ExprList>(loc(), std::move(to),
+                                      std::move(toGenerator));
   }
 
 private:
   std::vector<std::unique_ptr<Expression>> elements;
+  std::vector<std::unique_ptr<Generator>> generators;
+};
+
+class ExprProc : public Expression {
+public:
+  ExprProc(Location location,
+           std::vector<std::unique_ptr<ParameterVarDecl>> valueParams,
+           std::vector<std::unique_ptr<Statement>> body)
+      : Expression(Expr_Proc, location), valueParams(std::move(valueParams)),
+        body(std::move(body)) {}
+
+  std::unique_ptr<Expression> clone() const override {
+    std::vector<std::unique_ptr<ParameterVarDecl>> toValueParams;
+    toValueParams.reserve(valueParams.size());
+    for (const auto &e : valueParams) {
+      auto t = std::unique_ptr<ParameterVarDecl>(
+          static_cast<ParameterVarDecl *>(e->clone().release()));
+      toValueParams.push_back(std::move(t));
+    }
+
+    std::vector<std::unique_ptr<Statement>> toBody;
+    toBody.reserve(body.size());
+    for (const auto &e : body) {
+      toBody.push_back(e->clone());
+    }
+
+    return std::make_unique<ExprProc>(loc(), std::move(toValueParams),
+                                      std::move(toBody));
+  }
+
+  llvm::ArrayRef<std::unique_ptr<ParameterVarDecl>> getValueParameters() {
+    return valueParams;
+  }
+  llvm::ArrayRef<std::unique_ptr<Statement>> getBody() { return body; }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) { return c->getKind() == Expr_Proc; }
+
+private:
+  std::vector<std::unique_ptr<ParameterVarDecl>> valueParams;
+  std::vector<std::unique_ptr<Statement>> body;
 };
 
 class ExprSet : public Expression {
 public:
-  ExprSet(Location loc, std::vector<std::unique_ptr<Expression>> elements)
-      : Expression(Expr_Set, loc), elements(std::move(elements)) {}
+  ExprSet(Location loc, std::vector<std::unique_ptr<Expression>> elements,
+          std::vector<std::unique_ptr<Generator>> generators)
+      : Expression(Expr_Set, loc), elements(std::move(elements)),
+        generators(std::move(generators)) {}
 
   llvm::ArrayRef<std::unique_ptr<Expression>> getElements() { return elements; }
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
+  }
 
   std::unique_ptr<Expression> clone() const override {
-    return std::unique_ptr<Expression>();
+    std::vector<std::unique_ptr<Expression>> to;
+    to.reserve(elements.size());
+    for (const auto &e : elements) {
+      to.push_back(e->clone());
+    }
+
+    std::vector<std::unique_ptr<Generator>> toGenerator;
+    to.reserve(generators.size());
+    for (const auto &e : generators) {
+      toGenerator.push_back(e->clone());
+    }
+
+    return std::make_unique<ExprSet>(loc(), std::move(to),
+                                     std::move(toGenerator));
   }
 
   /// LLVM style RTTI
@@ -1275,6 +1394,7 @@ public:
 
 private:
   std::vector<std::unique_ptr<Expression>> elements;
+  std::vector<std::unique_ptr<Generator>> generators;
 };
 
 class ExprTuple : public Expression {
@@ -1673,34 +1793,6 @@ private:
   std::unique_ptr<Variable> variable;
 };
 
-/// Base class for all statements nodes.
-class Statement {
-public:
-  enum StatementKind {
-    Stmt_Assignment,
-    Stmt_Block,
-    Stmt_Call,
-    // Stmt_Case,
-    Stmt_Consume,
-    Stmt_Foreach,
-    Stmt_If,
-    Stmt_Read,
-    Stmt_While,
-    Stmt_Write
-  };
-  Statement(StatementKind kind, Location location)
-      : kind(kind), location(location) {}
-  virtual ~Statement() = default;
-
-  StatementKind getKind() const { return kind; }
-
-  const Location &loc() { return location; }
-
-private:
-  const StatementKind kind;
-  Location location;
-};
-
 class StmtAssignment : public Statement {
 public:
   StmtAssignment(Location location,
@@ -1710,6 +1802,11 @@ public:
       : Statement(Stmt_Assignment, location),
         annotations(std::move(annotations)), lvalue(std::move(lvalue)),
         expression(std::move(expression)) {}
+
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtAssignment>();
+  }
 
   LValue *getLValue() { return lvalue.get(); }
   Expression *getExpression() { return expression.get(); }
@@ -1737,6 +1834,11 @@ public:
       : Statement(Stmt_Block, location), annotations(std::move(annotations)),
         typeDecls(std::move(typeDecls)), varDecls(std::move(varDecls)),
         statements(std::move(statements)) {}
+
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtBlock>();
+  }
 
   llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
     return annotations;
@@ -1767,6 +1869,11 @@ public:
            std::vector<std::unique_ptr<Expression>> args)
       : Statement(Stmt_Call, location), procedure(std::move(procedure)),
         args(std::move(args)) {}
+
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtCall>();
+  }
 
   Expression *getProcedure() { return procedure.get(); }
 
@@ -1810,6 +1917,11 @@ public:
         generator(std::move(generator)), filters(std::move(filters)),
         body(std::move(body)) {}
 
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtForeach>();
+  }
+
   llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
     return annotations;
   }
@@ -1837,6 +1949,11 @@ public:
       : Statement(Stmt_If, location), condition(std::move(condition)),
         thenBranch(std::move(thenBranch)), elseBranch(std::move(elseBranch)) {}
 
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtIf>();
+  }
+
   Expression *getCondition() { return condition.get(); }
   llvm::ArrayRef<std::unique_ptr<Statement>> getThenBranch() {
     return thenBranch;
@@ -1862,6 +1979,11 @@ public:
       : Statement(Stmt_Read, location), port(std::move(port)),
         lvalues(std::move(lvalues)), repeat(std::move(repeat)) {}
 
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtRead>();
+  }
+
   Port *getPort() { return port.get(); }
   llvm::ArrayRef<std::unique_ptr<LValue>> getLValues() { return lvalues; }
   Expression *getExpression() { return repeat.get(); }
@@ -1884,6 +2006,11 @@ public:
       : Statement(Stmt_While, location), annotations(std::move(annotations)),
         condition(std::move(condition)), body(std::move(body)) {}
 
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtWhile>();
+  }
+
   llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
     return annotations;
   }
@@ -1905,6 +2032,11 @@ public:
             std::unique_ptr<Expression> repeat)
       : Statement(Stmt_Write, location), port(std::move(port)),
         values(std::move(values)), repeat(std::move(repeat)) {}
+
+  // TODO : Implement me
+  std::unique_ptr<Statement> clone() const override {
+    return std::unique_ptr<StmtWrite>();
+  }
 
   Port *getPort() { return port.get(); }
   llvm::ArrayRef<std::unique_ptr<Expression>> getValues() { return values; }
