@@ -194,7 +194,7 @@
 
 /*%printer { yyo << $$; } <*>;*/
 
-%type <std::unique_ptr<QID>> simple_qid qid
+%type <std::unique_ptr<QID>> simple_qid qid action_qid
 
 %type <std::unique_ptr<NamespaceDecl>> namespace_decl namespace_decl_default
 
@@ -202,9 +202,9 @@
 
 %type <std::unique_ptr<Import>> import single_import group_import
 
-%type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr
+%type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr repeat.opt delay.opt
 
-%type <std::string> unary_op
+%type <std::string> unary_op label_opt
 
 %type <std::unique_ptr<Parameter>> parameter_assignment type_parameter value_parameter
 
@@ -238,7 +238,24 @@
 
 %type <bool> multi.opt
 
-%type <std::unique_ptr<PortDecl>> port_input
+%type <std::unique_ptr<PortDecl>> port_input port_output
+
+%type <std::unique_ptr<Port>> port
+
+%type <std::unique_ptr<InputVarDecl>> decl_input
+
+%type <std::unique_ptr<InputPattern>> input_pattern
+
+%type <std::unique_ptr<OutputExpression>> output_expr
+
+%type <std::vector<std::unique_ptr<Expression>>> guards.opt exprs exprs.opt
+
+%type <std::vector<std::unique_ptr<Statement>>> stmts stmts.opt do_stmts.opt
+
+%type <std::unique_ptr<Action>> action
+
+%type <std::vector<std::unique_ptr<QID>>> priority prio_tag_list priority_clause priority_clauses.opt
+
 
 %left ".."
 %left "||" "or"
@@ -287,14 +304,16 @@ namespace_decl:
     "namespace" qid ":" namespace_decl_default "end"
     ;
 
+/*
 namespace_decl_default :
     imports.opt global_var_decls.opt
     ;
 
-/*
-namespace_decl_default: stmt
-                      ;
 */
+
+namespace_decl_default: priority
+                      ;
+
 
 /* Imports */
 
@@ -446,10 +465,14 @@ opt_comma:
     |   ","
     ;
 
-%nterm <std::vector<std::unique_ptr<cal::Expression>>> exprs;
 exprs:
         expr { $$.push_back($1); }
     |   exprs "," expr { $$=$1; $$.push_back($3); }
+    ;
+
+exprs.opt:
+        %empty {/* empty */}
+    |   exprs { $$=$1; }
     ;
 
 if_expr:
@@ -835,16 +858,14 @@ stmt:
     |   while_stmt
     ;
 
-%nterm <std::vector<std::unique_ptr<Statement>>> stmts.plus;
-stmts.plus:
+stmts:
         stmt { $$.push_back($1); }
-    |   stmts.plus stmt { $$=$1; $$.push_back($2); }
+    |   stmts stmt { $$=$1; $$.push_back($2); }
     ;
 
-%nterm <std::vector<std::unique_ptr<Statement>>> stmts;
-stmts:
+stmts.opt:
         %empty {/* empty */}
-    |   stmts.plus { $$=$1; }
+    |   stmts{ $$=$1; }
     ;
 
 assignment_stmt:
@@ -856,42 +877,42 @@ call_stmt:
     ;
 
 block_stmt:
-        "begin" stmts "end"                            { $$ = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::vector<std::unique_ptr<LocalVarDecl>>(), std::move($2));}
-    |   "begin" "var" block_var_decls "do" stmts "end" { $$ = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($3), std::move($5));}
+        "begin" stmts.opt "end"                            { $$ = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::vector<std::unique_ptr<LocalVarDecl>>(), std::move($2));}
+    |   "begin" "var" block_var_decls "do" stmts.opt "end" { $$ = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($3), std::move($5));}
     ;
 
 if_stmt:
-        "if" expr "then" stmts elsif_stmt "end"
+        "if" expr "then" stmts.opt elsif_stmt "end"
         {
             std::vector<std::unique_ptr<Statement>> elsif;
             elsif.push_back(std::move($5));
             $$ = std::make_unique<StmtIf>(@$, std::move($2), std::move($4), std::move(elsif));
         }
-    |   "if" expr "then" stmts "else" stmts "end"
+    |   "if" expr "then" stmts.opt "else" stmts.opt "end"
         {
             $$ = std::make_unique<StmtIf>(@$, std::move($2), std::move($4), std::move($6));
         }
     ;
 
 elsif_stmt:
-        "elsif" expr "then" stmts elsif_stmt
+        "elsif" expr "then" stmts.opt elsif_stmt
         {
             std::vector<std::unique_ptr<Statement>> elsif;
             elsif.push_back(std::move($5));
             $$ = std::make_unique<StmtIf>(@$, std::move($2), std::move($4), std::move(elsif));
         }
-    |   "elsif" expr "then" stmts "else" stmts
+    |   "elsif" expr "then" stmts.opt "else" stmts.opt
         {
             $$ = std::make_unique<StmtIf>(@$, std::move($2), std::move($4), std::move($6));
         }
     ;
 
 while_stmt:
-        "while" expr "do" stmts "end"
+        "while" expr "do" stmts.opt "end"
         {
             $$ = std::make_unique<StmtWhile>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move($2), std::move($4));
         }
-    |   "while" expr "var" block_var_decls "do" stmts "end"
+    |   "while" expr "var" block_var_decls "do" stmts.opt "end"
         {
             std::unique_ptr<StmtBlock> body = std::make_unique<StmtBlock>(@3, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($4), std::move($6));
             std::vector<std::unique_ptr<Statement>> stmts;
@@ -934,8 +955,8 @@ foreach_body_stmt: "," foreach_header_stmt
                     stmts.push_back(std::move($2));
                     $$ = std::move(stmts);
                  }
-                 | "do" stmts { $$ = $2;}
-                 | "var" block_var_decls "do" stmts
+                 | "do" stmts.opt { $$ = $2;}
+                 | "var" block_var_decls "do" stmts.opt
                  {
                     std::unique_ptr<StmtBlock> body = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));
                     std::vector<std::unique_ptr<Statement>> stmts;
@@ -960,7 +981,7 @@ port_input:
 %nterm <std::vector<std::unique_ptr<PortDecl>>> port_inputs;
 port_inputs:
         port_input { $$.push_back($1); }
-    |   port_inputs port_input { $$=$1; $$.push_back($2); }
+    |   port_inputs "," port_input { $$=$1; $$.push_back($3); }
     ;
 
 %nterm <std::vector<std::unique_ptr<PortDecl>>> port_inputs.opt;
@@ -969,11 +990,175 @@ port_inputs.opt:
     |   port_inputs { $$=$1; }
     ;
 
+port_output:
+        multi.opt ID {$$ = std::make_unique<PortDecl>(@$,std::unique_ptr<TypeExpr>(), $2);}
+    |   multi.opt type ID  {$$ = std::make_unique<PortDecl>(@$,std::move($2), $3);}
+
+%nterm <std::vector<std::unique_ptr<PortDecl>>> port_outputs;
+port_outputs:
+        port_output { $$.push_back($1); }
+    |   port_outputs "," port_output { $$=$1; $$.push_back($3); }
+    ;
+
+%nterm <std::vector<std::unique_ptr<PortDecl>>> port_outputs.opt;
+port_outputs.opt:
+        %empty {/* empty */}
+    |   port_outputs { $$=$1; }
+    ;
+
 
 /* actor_head: "actor" ID "(" formal_value_parameters.opt ")" */
 
+/* Action */
 
 
+decl_input:
+    ID { $$ = std::make_unique<InputVarDecl>(@$, $1); }
+    ;
+%nterm <std::vector<std::unique_ptr<InputVarDecl>>> decl_inputs;
+decl_inputs:
+        decl_input { $$.push_back($1); }
+    |   decl_inputs "," decl_input { $$=$1; $$.push_back($3); }
+    ;
+
+port:
+        %empty {$$ = std::unique_ptr<Port>(); }
+    |   ID { $$ = std::make_unique<Port>(@$, $1); }
+    ;
+
+
+input_pattern:
+    port ":" input_body repeat.opt channel.opt
+     {
+        $$ = std::make_unique<InputPattern>(@$, std::move($1), std::move($3), std::move($4));
+    }
+    ;
+
+%nterm <std::vector<std::unique_ptr<InputVarDecl>>> input_body;
+input_body:
+        decl_input { $$.push_back($1); }
+    |   "[" "]" { /* empty*/ }
+    |   "[" decl_inputs "]" {$$ = $2;}
+    ;
+
+%nterm <std::vector<std::unique_ptr<InputPattern>>> input_patterns;
+input_patterns:
+        input_pattern { $$.push_back($1); }
+    |   input_patterns "," input_pattern { $$=$1; $$.push_back($3); }
+    ;
+
+%nterm <std::vector<std::unique_ptr<InputPattern>>> input_patterns.opt;
+input_patterns.opt:
+        %empty
+    |   input_patterns { $$ = $1; }
+    ;
+
+repeat.opt:
+        %empty
+    |   "repeat" expr
+    ;
+
+channel.opt:
+        %empty
+    |   "at*" "any"
+    |   "at*" "all"
+    |   "at*" expr
+    |   "any"
+    |   "all"
+    |   "at" expr
+    ;
+
+output_expr:
+    port  ":" "[" exprs.opt "]" repeat.opt channel.opt
+    {
+        $$ = std::make_unique<OutputExpression>(@$, std::move($1), std::move($4), std::move($6));
+    }
+    ;
+
+%nterm <std::vector<std::unique_ptr<OutputExpression>>> output_exprs;
+output_exprs:
+        output_expr { $$.push_back($1); }
+    |   output_exprs "," output_expr { $$=$1; $$.push_back($3); }
+    ;
+
+%nterm <std::vector<std::unique_ptr<OutputExpression>>> output_exprs.opt;
+output_exprs.opt:
+        %empty
+    |   output_exprs { $$ = $1; }
+    ;
+
+guards.opt:
+        %empty
+    |   "guard" exprs { $$ = $2; }
+    ;
+
+delay.opt:
+        %empty  { $$ = std::unique_ptr<Expression>(); }
+    |   "delay" expr { $$ = $2; }
+    ;
+
+requires.opt:
+        %empty
+    |   "require" exprs
+    ;
+
+ensures.opt:
+        %empty
+    |   "ensure" exprs
+    ;
+
+do_stmts.opt:
+        %empty
+    |   "do" stmts {$$ = $2;}
+    ;
+
+action_qid:
+        %empty  { $$ = std::unique_ptr<QID>(); }
+    |   qid ":" { $$ = $1; }
+    ;
+
+action:
+    action_qid "action" input_patterns.opt "==>" output_exprs.opt guards.opt delay.opt requires.opt ensures.opt var_decls.opt do_stmts.opt "end"
+    {
+        $$ = std::make_unique<Action>(@$,
+            std::vector<std::unique_ptr<Annotation>>(),
+            std::move($1),
+            std::move($3),
+            std::move($5),
+            std::vector<std::unique_ptr<TypeDecl>>(),
+            std::move($10),
+            std::move($6),
+            std::move($11),
+            std::move($7)
+        );
+    }
+    ;
+
+
+/* Priority */
+
+priority:
+    "priority" priority_clauses.opt "end" {$$ = $2;}
+    ;
+
+priority_clauses.opt:
+        %empty
+    |   priority_clause {$$ = $1;}
+    ;
+
+priority_clause:
+    prio_tag_list qid ";"
+    {
+        std::vector<std::unique_ptr<QID>> prio = $1;
+        prio.push_back(std::move($2));
+        $$ = std::move(prio);
+    }
+    ;
+
+prio_tag_list:
+        qid ">" { $$.push_back($1); }
+    |   prio_tag_list qid ">" { $$=$1; $$.push_back($2); }
+    ;
 
 %%
 
