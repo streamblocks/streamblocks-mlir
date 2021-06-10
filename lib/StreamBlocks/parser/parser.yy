@@ -254,8 +254,13 @@
 
 %type <std::unique_ptr<Action>> action
 
-%type <std::vector<std::unique_ptr<QID>>> priority prio_tag_list priority_clause priority_clauses.opt
+%type <std::vector<std::unique_ptr<QID>>> priority prio_tag_list priority_clause priority_clauses.opt schedule_fsm_tags
 
+%type <std::unique_ptr<Schedule>> schedule schedule_fsm schedule_regexp
+
+%type <std::unique_ptr<Transition>> schedule_fsm_transition
+
+%type <std::unique_ptr<RegExp>> schedule_alt_expression schedule_alt_expressions schedule_expression schedule_multiplicity_expression schedule_opt_expression schedule_seq_expression schedule_seq_expressions schedule_unary_expression schedule_var_expression
 
 %left ".."
 %left "||" "or"
@@ -273,7 +278,7 @@
 %nonassoc "if"
 %nonassoc "else"
 
-%left ","
+%nonassoc ","
 
 %%
 %start unit;
@@ -311,7 +316,7 @@ namespace_decl_default :
 
 */
 
-namespace_decl_default: priority
+namespace_decl_default: schedule
                       ;
 
 
@@ -1160,10 +1165,127 @@ prio_tag_list:
     |   prio_tag_list qid ">" { $$=$1; $$.push_back($2); }
     ;
 
+schedule:
+        schedule_fsm
+    |   schedule_regexp
+    ;
+
+schedule_fsm:
+    "schedule" "fsm" ID ":" schedule_fsm_transitions "end"
+    {
+        $$ = std::make_unique<ScheduleFSM>(@$, $3, std::move($5));
+    }
+    ;
+
+%nterm <std::vector<std::unique_ptr<Transition>>> schedule_fsm_transitions;
+schedule_fsm_transitions:
+        %empty
+    |   schedule_fsm_transitions schedule_fsm_transition { $$=$1; $$.push_back($2); }
+    ;
+
+schedule_fsm_transition:
+    ID  "(" schedule_fsm_tags ")" "-->" ID ";"
+    {
+        $$ = std::make_unique<Transition>(@$, $1, $6, std::move($3));
+    }
+    ;
+
+schedule_fsm_tags:
+        qid { $$.push_back($1); }
+    |   schedule_fsm_tags "," qid { $$=$1; $$.push_back($3); }
+    ;
+
+schedule_regexp:
+    "schedule" "regexp" schedule_expression "end"
+    {
+        $$ = std::make_unique<ScheduleRegExp>(@$, $3);
+    }
+    ;
+
+schedule_alt_expression:
+        schedule_seq_expression
+    |   schedule_alt_expressions
+    ;
+
+schedule_alt_expressions:
+        schedule_seq_expression "|" schedule_seq_expression
+        {
+            $$ = std::make_unique<RegExpAlt>(@$, std::move($1), std::move($3));
+        }
+    |   schedule_alt_expressions "|" schedule_seq_expression
+        {
+            $$ = std::make_unique<RegExpAlt>(@$, std::move($1), std::move($3));
+        }
+    ;
+
+schedule_expression:
+    schedule_alt_expression
+    ;
+
+schedule_multiplicity_expression:
+        "(" schedule_expression ")"
+        {
+            $$ = $2;
+        }
+    |   "(" schedule_expression ")" "+"
+        {
+            $$ = std::make_unique<RegExpUnary>(@$, $4, std::move($2));
+        }
+    |   "(" schedule_expression ")" "*"
+        {
+            $$ = std::make_unique<RegExpUnary>(@$, $4, std::move($2));
+        }
+    |   "(" schedule_expression ")" "?"
+        {
+            $$ = std::make_unique<RegExpUnary>(@$, $4, std::move($2));
+        }
+    |   "(" schedule_expression ")" "#" "(" expr ")"
+        {
+            $$ = std::make_unique<RegExpRep>(@$, std::move($2), std::move($6), std::unique_ptr<Expression>());
+        }
+    |   "(" schedule_expression ")" "#" "(" expr "," expr ")"
+        {
+            $$ = std::make_unique<RegExpRep>(@$, std::move($2), std::move($6), std::move($8));
+        }
+    ;
+
+schedule_opt_expression:
+    "[" schedule_expression "]"
+    {
+        $$ = std::make_unique<RegExpOpt>(@$, std::move($2));
+    }
+    ;
+
+schedule_seq_expression:
+        schedule_unary_expression
+    |   schedule_seq_expressions
+    ;
+
+schedule_seq_expressions:
+        schedule_unary_expression schedule_unary_expression
+        {
+            $$ = std::make_unique<RegExpSeq>(@$, std::move($1), std::move($2));
+        }
+    |   schedule_seq_expressions schedule_unary_expression
+        {
+            $$ = std::make_unique<RegExpSeq>(@$, std::move($1), std::move($2));
+        }
+    ;
+
+schedule_unary_expression:
+        schedule_var_expression
+    |   schedule_multiplicity_expression
+    |   schedule_opt_expression
+    ;
+
+schedule_var_expression:
+    qid
+    {
+        $$ = std::make_unique<RegExpTag>(@$, std::move($1));
+    }
+    ;
+
 %%
-
-
-
 
 
 

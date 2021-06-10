@@ -1,1 +1,1 @@
-priority a > b > c.d ; end
+schedule regexp (a b)+ end

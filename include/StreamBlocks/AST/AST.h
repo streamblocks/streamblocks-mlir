@@ -2240,24 +2240,43 @@ private:
   std::vector<std::unique_ptr<QID>> actionTag;
 };
 
+class Schedule {
+public:
+  enum ScheduleKind { Schedule_FSM, Schedule_Regexp };
+  Schedule(ScheduleKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~Schedule() = default;
+
+  // virtual std::unique_ptr<Schedule> clone() const = 0;
+
+  ScheduleKind getKind() const { return kind; }
+
+  const Location &loc() const { return location; }
+
+private:
+  const ScheduleKind kind;
+  Location location;
+};
+
 /// Base class for Schedule FSM node.
-class ScheduleFSM {
+class ScheduleFSM : public Schedule {
 public:
   ScheduleFSM(Location location, std::string initialState,
               std::vector<std::unique_ptr<Transition>> transitions)
-      : location(location), initialState(initialState),
+      : Schedule(Schedule_FSM, location), initialState(initialState),
         transitions(std::move(transitions)) {}
 
-  virtual ~ScheduleFSM() = default;
-
-  const Location &loc() { return location; }
   std::string getInitialState() { return initialState; }
   llvm::ArrayRef<std::unique_ptr<Transition>> getTransitions() {
     return transitions;
   }
 
+  /// LLVM style RTTI
+  static bool classof(const Schedule *c) {
+    return c->getKind() == Schedule_FSM;
+  }
+
 private:
-  Location location;
   std::string initialState;
   std::vector<std::unique_ptr<Transition>> transitions;
 };
@@ -2265,7 +2284,14 @@ private:
 /// Base class for all regexp nodes.
 class RegExp {
 public:
-  enum RegExpKind { RegExp_Tag, RegExp_Unary, RegExp_Binary };
+  enum RegExpKind {
+    RegExp_Tag,
+    RegExp_Unary,
+    RegExp_Alt,
+    RegExp_Seq,
+    RegExp_Opt,
+    RegExp_Rep
+  };
   RegExp(RegExpKind kind, Location location) : kind(kind), location(location) {}
   virtual ~RegExp() = default;
 
@@ -2310,23 +2336,88 @@ private:
   std::unique_ptr<RegExp> operand;
 };
 
-class RegExpBinary : public RegExp {
+class RegExpOpt : public RegExp {
 public:
-  llvm::StringRef getOp() { return op; }
+  RegExpOpt(Location location, std::unique_ptr<RegExp> operand)
+      : RegExp(RegExp_Opt, location), operand(std::move(operand)) {}
+
+  RegExp *getOperand() { return operand.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const RegExp *c) { return c->getKind() == RegExp_Opt; }
+
+private:
+  std::unique_ptr<RegExp> operand;
+};
+
+class RegExpRep : public RegExp {
+public:
+  RegExpRep(Location location, std::unique_ptr<RegExp> operand,
+            std::unique_ptr<Expression> min, std::unique_ptr<Expression> max)
+      : RegExp(RegExp_Rep, location), operand(std::move(operand)),
+        min(std::move(min)), max(std::move(max)) {}
+
+  RegExp *getOperand() { return operand.get(); }
+
+  Expression *getMin() { return min.get(); }
+
+  Expression *getMax() { return max.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const RegExp *c) { return c->getKind() == RegExp_Rep; }
+
+private:
+  std::unique_ptr<RegExp> operand;
+  std::unique_ptr<Expression> min;
+  std::unique_ptr<Expression> max;
+};
+
+class RegExpAlt : public RegExp {
+public:
+  RegExpAlt(Location loc, std::unique_ptr<RegExp> lhs,
+            std::unique_ptr<RegExp> rhs)
+      : RegExp(RegExp_Alt, loc), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
+
   RegExp *getLHS() { return lhs.get(); }
   RegExp *getRHS() { return rhs.get(); }
 
-  RegExpBinary(Location loc, std::string op, std::unique_ptr<RegExp> lhs,
-               std::unique_ptr<RegExp> rhs)
-      : RegExp(RegExp_Binary, loc), op(op), lhs(std::move(lhs)),
-        rhs(std::move(rhs)) {}
-
   /// LLVM style RTTI
-  static bool classof(const RegExp *c) { return c->getKind() == RegExp_Binary; }
+  static bool classof(const RegExp *c) { return c->getKind() == RegExp_Alt; }
 
 private:
-  std::string op;
   std::unique_ptr<RegExp> lhs, rhs;
+};
+
+class RegExpSeq : public RegExp {
+public:
+  RegExpSeq(Location loc, std::unique_ptr<RegExp> lhs,
+            std::unique_ptr<RegExp> rhs)
+      : RegExp(RegExp_Seq, loc), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
+
+  RegExp *getLHS() { return lhs.get(); }
+  RegExp *getRHS() { return rhs.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const RegExp *c) { return c->getKind() == RegExp_Seq; }
+
+private:
+  std::unique_ptr<RegExp> lhs, rhs;
+};
+
+class ScheduleRegExp : public Schedule {
+public:
+  ScheduleRegExp(Location location, std::unique_ptr<RegExp> regexp)
+      : Schedule(Schedule_Regexp, location), regexp(std::move(regexp)) {}
+
+  RegExp *getRegExp() { return regexp.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Schedule *c) {
+    return c->getKind() == Schedule_Regexp;
+  }
+
+private:
+  std::unique_ptr<RegExp> regexp;
 };
 
 /// Base class for all Entity nodes.
@@ -2376,17 +2467,14 @@ public:
            std::vector<std::unique_ptr<Expression>> invariants,
            std::vector<std::unique_ptr<Action>> actions,
            std::vector<std::unique_ptr<Action>> initializers,
-           std::unique_ptr<ScheduleFSM> scheduleFsm,
-           std::unique_ptr<RegExp> scheduleRegExp,
+           std::unique_ptr<Schedule> schedule,
            std::vector<std::unique_ptr<QID>> priorities)
       : Entity(Entity_Actor, location, name, std::move(annotations),
                std::move(inputPorts), std::move(outputPorts),
                std::move(typeParameters), std::move(valueParameters)),
         varDecls(std::move(varDecls)), typeDecls(std::move(typeDecls)),
         invariants(std::move(invariants)), actions(std::move(actions)),
-        initializers(std::move(initializers)),
-        scheduleFSM(std::move(scheduleFsm)),
-        scheduleRegExp(std::move(scheduleRegExp)),
+        initializers(std::move(initializers)), schedule(std::move(schedule)),
         priorities(std::move(priorities)) {}
 
   llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
@@ -2400,8 +2488,8 @@ public:
   llvm::ArrayRef<std::unique_ptr<Action>> getInitializers() {
     return initializers;
   }
-  ScheduleFSM *getScheduleFSM() { return scheduleFSM.get(); }
-  RegExp *getScheduleRegExp() { return scheduleRegExp.get(); }
+  Schedule *getSchedule() { return schedule.get(); }
+
   llvm::ArrayRef<std::unique_ptr<QID>> getPriorities() { return priorities; }
 
   /// LLVM style RTTI
@@ -2413,8 +2501,7 @@ private:
   std::vector<std::unique_ptr<Expression>> invariants;
   std::vector<std::unique_ptr<Action>> actions;
   std::vector<std::unique_ptr<Action>> initializers;
-  std::unique_ptr<ScheduleFSM> scheduleFSM;
-  std::unique_ptr<RegExp> scheduleRegExp;
+  std::unique_ptr<Schedule> schedule;
   std::vector<std::unique_ptr<QID>> priorities;
 };
 
