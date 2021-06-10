@@ -2456,7 +2456,7 @@ private:
 
 class CalActor : public Entity {
 public:
-  CalActor(Location &location, std::string name,
+  CalActor(Location location, std::string name,
            std::vector<std::unique_ptr<Annotation>> annotations,
            std::vector<std::unique_ptr<PortDecl>> inputPorts,
            std::vector<std::unique_ptr<PortDecl>> outputPorts,
@@ -2477,6 +2477,22 @@ public:
         initializers(std::move(initializers)), schedule(std::move(schedule)),
         priorities(std::move(priorities)) {}
 
+  CalActor(Location location, std::string name,
+           std::vector<std::unique_ptr<PortDecl>> inputPorts,
+           std::vector<std::unique_ptr<PortDecl>> outputPorts,
+           std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+           std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters)
+      : CalActor(location, name, std::vector<std::unique_ptr<Annotation>>(),
+                 std::move(inputPorts), std::move(outputPorts),
+                 std::move(typeParameters), std::move(valueParameters),
+                 std::vector<std::unique_ptr<LocalVarDecl>>(),
+                 std::vector<std::unique_ptr<TypeDecl>>(),
+                 std::vector<std::unique_ptr<Expression>>(),
+                 std::vector<std::unique_ptr<Action>>(),
+                 std::vector<std::unique_ptr<Action>>(),
+                 std::unique_ptr<Schedule>(),
+                 std::vector<std::unique_ptr<QID>>()) {}
+
   llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
     return varDecls;
   }
@@ -2491,6 +2507,26 @@ public:
   Schedule *getSchedule() { return schedule.get(); }
 
   llvm::ArrayRef<std::unique_ptr<QID>> getPriorities() { return priorities; }
+
+  void addVarDecl(std::unique_ptr<LocalVarDecl> varDecl) {
+    varDecls.push_back(std::move(varDecl));
+  }
+
+  void addAction(std::unique_ptr<Action> action) {
+    actions.push_back(std::move(action));
+  }
+
+  void addInitializer(std::unique_ptr<Action> action) {
+    initializers.push_back(std::move(action));
+  }
+
+  void addInvariant(std::unique_ptr<Expression> expression) {
+    invariants.push_back(std::move(expression));
+  }
+
+  void setSchedule(std::unique_ptr<Schedule> schedule_) {
+    schedule = std::move(schedule_);
+  }
 
   /// LLVM style RTTI
   static bool classof(const Entity *c) { return c->getKind() == Entity_Actor; }

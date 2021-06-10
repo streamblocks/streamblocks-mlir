@@ -1012,7 +1012,8 @@ port_outputs.opt:
     ;
 
 
-/* actor_head: "actor" ID "(" formal_value_parameters.opt ")" */
+actor_head: "actor" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt
+;
 
 /* Action */
 
