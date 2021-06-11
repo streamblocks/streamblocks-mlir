@@ -193,8 +193,6 @@
 %token <char>        CHAR
 
 
-/*%printer { yyo << $$; } <*>;*/
-
 %type <std::unique_ptr<QID>> simple_qid qid action_qid
 
 %type <std::unique_ptr<NamespaceDecl>> namespace_decl namespace_decl_default
@@ -261,6 +259,10 @@
 
 %type <std::unique_ptr<CalActor>> actor actor_body actor_head
 
+%type <std::unique_ptr<Entity>> global_entity
+
+%type <std::unique_ptr<GlobalEntityDecl>> global_entity_decl
+
 %type <std::unique_ptr<ProcessDescription>> process_description
 
 %type <std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>> mapping
@@ -310,17 +312,37 @@ qid :
 
 namespace_decl:
     "namespace" qid ":" namespace_decl_default "end"
+    {
+        auto ns = $4;
+        ns->setQID($2);
+        $$ = std::move(ns);
+    }
     ;
 
-/*
 namespace_decl_default :
-    imports.opt global_var_decls.opt
+        %empty
+        {
+            $$ = std::make_unique<NamespaceDecl>();
+        }
+    |   namespace_decl_default import
+        {
+            auto ns = $1;
+            ns->addImport($2);
+            $$ = std::move(ns);
+        }
+    |   namespace_decl_default global_var_decl
+        {
+            auto ns = $1;
+            ns->addVarDecl($2);
+            $$ = std::move(ns);
+        }
+    |   namespace_decl_default global_entity_decl
+        {
+           auto ns = $1;
+           ns->addEntityDecl($2);
+           $$ = std::move(ns);
+        }
     ;
-
-*/
-
-namespace_decl_default: actor
-                      ;
 
 
 /* Imports */
@@ -356,20 +378,6 @@ import:
     |   "import" group_import   ";" { $$ = $2; }
     ;
 
-%nterm <std::vector<std::unique_ptr<cal::Import>>> imports.opt;
-imports.opt:
-        %empty {/* empty */}
-   |    imports { $$=$1; }
-   ;
-
-%nterm <std::vector<std::unique_ptr<cal::Import>>> imports;
-imports:
-        import {$$.push_back($1);}
-    |   imports import { $$=$1; $$.push_back($2); }
-    ;
-
-
-
 /* Expression */
 
 exprs:
@@ -396,6 +404,7 @@ postfix_expr:
 
 primary_expr:
         var_expr
+    |   application_expr
     |   literal_expr
     |   if_expr
     |   lambda_expr
@@ -829,19 +838,6 @@ block_var_decl:
         }
     ;
 
-
-%nterm <std::vector<std::unique_ptr<GlobalVarDecl>>> global_var_decls_plus;
-global_var_decls_plus:
-        global_var_decl { $$.push_back($1); }
-    |   global_var_decls_plus "," global_var_decl { $$=$1; $$.push_back($3); }
-    ;
-
-%nterm <std::vector<std::unique_ptr<GlobalVarDecl>>> global_var_decls.opt;
-global_var_decls.opt:
-        %empty { /* empty list */ }
-    |   global_var_decls_plus{ $$=$1; }
-    ;
-
 global_var_decl:
                                 simple_var_decl
         {
@@ -861,19 +857,6 @@ global_var_decl:
         }
     ;
 
-
-%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> local_var_decls_plus;
-local_var_decls_plus:
-        local_var_decl { $$.push_back($1); }
-    |   local_var_decls_plus "," local_var_decl { $$=$1; $$.push_back($3); }
-    ;
-
-%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> local_var_decls;
-local_var_decls:
-        %empty { /* empty list */ }
-    |   local_var_decls_plus{ $$=$1; }
-    ;
-
 local_var_decl:
         "external" simple_var_decl
         {
@@ -889,8 +872,6 @@ local_var_decl:
         }
     ;
 
-
-
 simple_var_decl:
         variable_var_decl ";"
     |   function_var_decl
@@ -898,12 +879,30 @@ simple_var_decl:
     ;
 
 variable_var_decl:
-             ID            { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::unique_ptr<Expression>(), true, false); }
-    |        ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), false, false); }
-    |        ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), true, false); }
-    |   type ID            { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::unique_ptr<Expression>(), true, false); }
-    |   type ID ":=" expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), false, false); }
-    |   type ID "="  expr  { $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false); }
+             ID
+        {
+            $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::unique_ptr<Expression>(), true, false);
+        }
+    |        ID ":=" expr
+        {
+            $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), false, false);
+        }
+    |        ID "="  expr
+        {
+            $$ = std::make_unique<VarDecl>(@$, $1, std::unique_ptr<TypeExpr>(), std::move($3), true, false);
+        }
+    |   type ID
+        {
+            $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::unique_ptr<Expression>(), true, false);
+        }
+    |   type ID ":=" expr
+        {
+            $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), false, false);
+        }
+    |   type ID "="  expr
+        {
+            $$ = std::make_unique<VarDecl>(@$, $2, std::move($1), std::move($4), true, false);
+        }
     ;
 
 
@@ -1241,6 +1240,29 @@ process_description:
         }
     ;
 
+global_entity:
+    actor
+    {
+        auto entity = std::unique_ptr<Entity>(static_cast<Entity*>($1.release()));
+        $$ = std::move(entity);
+    }
+    ;
+
+global_entity_decl:
+                   global_entity
+        {
+            auto entity = $1;
+            std::string name = llvm::Twine(entity->getName()).str();
+            $$ = std::make_unique<GlobalEntityDecl>(@$, name, std::move(entity), Availability::PUBLIC, false);
+        }
+    |   "external" global_entity
+        {
+            auto entity = $2;
+            std::string name = llvm::Twine(entity->getName()).str();
+            $$ = std::make_unique<GlobalEntityDecl>(@$, name, std::move(entity), Availability::PUBLIC, true);
+        }
+    ;
+
 /* Action */
 
 
@@ -1282,13 +1304,13 @@ input_patterns:
 
 %nterm <std::vector<std::unique_ptr<InputPattern>>> input_patterns.opt;
 input_patterns.opt:
-        %empty
+        %empty         { $$ = std::vector<std::unique_ptr<InputPattern>>(); }
     |   input_patterns { $$ = $1; }
     ;
 
 repeat.opt:
-        %empty
-    |   "repeat" expr
+        %empty { $$ = std::unique_ptr<Expression>(); }
+    |   "repeat" expr { $$ = $2; }
     ;
 
 channel.opt:
@@ -1316,12 +1338,12 @@ output_exprs:
 
 %nterm <std::vector<std::unique_ptr<OutputExpression>>> output_exprs.opt;
 output_exprs.opt:
-        %empty
+        %empty {$$ = std::vector<std::unique_ptr<OutputExpression>>(); }
     |   output_exprs { $$ = $1; }
     ;
 
 guards.opt:
-        %empty
+        %empty        { $$ = std::vector<std::unique_ptr<Expression>>(); }
     |   "guard" exprs { $$ = $2; }
     ;
 
@@ -1341,8 +1363,8 @@ ensures.opt:
     ;
 
 do_stmts.opt:
-        %empty
-    |   "do" stmts {$$ = $2;}
+        %empty     { $$ = std::vector<std::unique_ptr<Statement>>(); }
+    |   "do" stmts { $$ = $2; }
     ;
 
 action_qid:
@@ -1391,8 +1413,8 @@ priority:
     ;
 
 priority_clauses.opt:
-        %empty
-    |   priority_clause {$$ = $1;}
+        %empty          { std::vector<std::unique_ptr<QID>>(); }
+    |   priority_clause { $$ = $1; }
     ;
 
 priority_clause:
@@ -1424,7 +1446,13 @@ schedule_fsm:
 %nterm <std::vector<std::unique_ptr<Transition>>> schedule_fsm_transitions;
 schedule_fsm_transitions:
         %empty
-    |   schedule_fsm_transitions schedule_fsm_transition { $$=$1; $$.push_back($2); }
+        {
+            $$ = std::vector<std::unique_ptr<Transition>>();
+        }
+    |   schedule_fsm_transitions schedule_fsm_transition
+        {
+            $$=$1; $$.push_back($2);
+        }
     ;
 
 schedule_fsm_transition:

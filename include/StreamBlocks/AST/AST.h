@@ -2472,6 +2472,8 @@ public:
 
   EntityKind getKind() const { return kind; }
 
+  llvm::StringRef getName() { return name; }
+
   const Location &loc() { return location; }
 
 private:
@@ -3018,9 +3020,15 @@ public:
         varDecls(std::move(varDecls)), entityDecls(std::move(entityDecls)),
         typeDecl(std::move(typeDecl)) {}
 
+  NamespaceDecl()
+      : NamespaceDecl(Location(), std::unique_ptr<QID>(),
+                      std::vector<std::unique_ptr<Import>>(),
+                      std::vector<std::unique_ptr<GlobalVarDecl>>(),
+                      std::vector<std::unique_ptr<GlobalEntityDecl>>(),
+                      std::vector<std::unique_ptr<GlobalTypeDecl>>()) {}
+
   virtual ~NamespaceDecl() = default;
 
-private:
   const Location &loc() { return location; }
   QID *getQID() { return qid.get(); }
 
@@ -3034,6 +3042,26 @@ private:
   llvm::ArrayRef<std::unique_ptr<GlobalTypeDecl>> getTypeDecls() {
     return typeDecl;
   }
+
+  void setLocation(Location location_) { location = location_; }
+
+  void addImport(std::unique_ptr<Import> import) {
+    imports.push_back(std::move(import));
+  }
+
+  void addVarDecl(std::unique_ptr<GlobalVarDecl> variable) {
+    varDecls.push_back(std::move(variable));
+  }
+
+  void addEntityDecl(std::unique_ptr<GlobalEntityDecl> entity) {
+    entityDecls.push_back(std::move(entity));
+  }
+
+  void addTypeDecl(std::unique_ptr<GlobalTypeDecl> type) {
+    typeDecl.push_back(std::move(type));
+  }
+
+  void setQID(std::unique_ptr<QID> qid_) { qid = std::move(qid_); }
 
 private:
   Location location;

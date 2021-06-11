@@ -1,3 +1,4 @@
+
 actor A() int a ==> int b:
 
     int token;
