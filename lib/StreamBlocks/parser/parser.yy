@@ -137,6 +137,7 @@
 %token COLON_EQUALS ":="
 %token COMMA ","
 %token DASH_DASH_GT "-->"
+%token LT_DASH_DASH "<--"
 %token DASH_GT "->"
 %token DOT "."
 
@@ -228,7 +229,7 @@
 
 %type <std::unique_ptr<GeneratorVarDecl>> generator_var_decl
 
-%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt read_stmt
+%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt read_stmt write_stmt
 
 %type <std::unique_ptr<StmtForeach>> foreach_header_stmt
 
@@ -884,6 +885,7 @@ stmt:
     |   if_stmt
     |   while_stmt
     |   read_stmt
+    |   write_stmt
     ;
 
 stmts:
@@ -953,6 +955,13 @@ read_stmt:
     port "-->" lvalues repeat.opt ";"
     {
         $$ = std::make_unique<StmtRead>(@$, std::move($1), std::move($3), std::move($4));
+    }
+    ;
+
+write_stmt:
+    port "<--" exprs repeat.opt ";"
+    {
+        $$ = std::make_unique<StmtWrite>(@$, $1, std::move($3), std::move($4));
     }
     ;
 

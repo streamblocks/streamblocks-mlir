@@ -3,7 +3,8 @@ actor A() int a ==> int b:
     int token;
 
     repeat
-        a --> token repeat 64 ;
+        a --> token;
+        b <-- token;
     end
 
 end
