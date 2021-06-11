@@ -32,7 +32,6 @@ using Location = cal::location;
 
 namespace cal {
 
-class GeneratorVarDecl;
 class Pattern;
 class Entity;
 
@@ -202,10 +201,18 @@ public:
         constant, external);
   }
 
-  TypeExpr *getType() const { return type.get(); }
+  TypeExpr *getType()  { return type.get(); }
   Expression *getValue() { return value.get(); }
-  bool getConstant() const { return constant; }
-  bool getExternal() const { return external; }
+  bool getConstant()  { return constant; }
+  bool getExternal()  { return external; }
+
+  void setConstant(bool value){
+    constant = value;
+  }
+
+  void setExternal(bool value){
+    external = value;
+  }
 
   static bool classof(const Parameter *c) {
     return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
@@ -214,8 +221,8 @@ public:
 protected:
   std::unique_ptr<TypeExpr> type;
   std::unique_ptr<Expression> value;
-  const bool constant;
-  const bool external;
+  bool constant;
+  bool external;
 };
 
 class GeneratorVarDecl : public VarDecl {
@@ -228,6 +235,7 @@ public:
                                               llvm::Twine(getName()).str());
   }
 };
+
 
 class AnnotationParameter {
 public:
@@ -563,11 +571,6 @@ public:
                std::unique_ptr<Expression> value, bool constant)
       : VarDecl(location, name, std::move(type), std::move(value), constant,
                 false) {}
-
-  LocalVarDecl(std::unique_ptr<VarDecl> decl, bool external)
-      : VarDecl(decl->loc(), llvm::Twine(decl->getName()).str(),
-                decl->getType()->clone(), decl->getValue()->clone(),
-                decl->getConstant(), external) {}
 
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<LocalVarDecl>(loc(), llvm::Twine(getName()).str(),
@@ -2454,6 +2457,8 @@ private:
   std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
 };
 
+
+
 class CalActor : public Entity {
 public:
   CalActor(Location location, std::string name,
@@ -2467,6 +2472,7 @@ public:
            std::vector<std::unique_ptr<Expression>> invariants,
            std::vector<std::unique_ptr<Action>> actions,
            std::vector<std::unique_ptr<Action>> initializers,
+           std::unique_ptr<ProcessDescription> process,
            std::unique_ptr<Schedule> schedule,
            std::vector<std::unique_ptr<QID>> priorities)
       : Entity(Entity_Actor, location, name, std::move(annotations),
@@ -2474,7 +2480,7 @@ public:
                std::move(typeParameters), std::move(valueParameters)),
         varDecls(std::move(varDecls)), typeDecls(std::move(typeDecls)),
         invariants(std::move(invariants)), actions(std::move(actions)),
-        initializers(std::move(initializers)), schedule(std::move(schedule)),
+        initializers(std::move(initializers)), process(std::move(process)), schedule(std::move(schedule)),
         priorities(std::move(priorities)) {}
 
   CalActor(Location location, std::string name,
@@ -2490,6 +2496,7 @@ public:
                  std::vector<std::unique_ptr<Expression>>(),
                  std::vector<std::unique_ptr<Action>>(),
                  std::vector<std::unique_ptr<Action>>(),
+                 std::unique_ptr<ProcessDescription>(),
                  std::unique_ptr<Schedule>(),
                  std::vector<std::unique_ptr<QID>>()) {}
 
@@ -2505,6 +2512,8 @@ public:
     return initializers;
   }
   Schedule *getSchedule() { return schedule.get(); }
+
+  ProcessDescription *getProcess() { return process.get(); }
 
   llvm::ArrayRef<std::unique_ptr<QID>> getPriorities() { return priorities; }
 
@@ -2528,6 +2537,15 @@ public:
     schedule = std::move(schedule_);
   }
 
+  void setProcess(std::unique_ptr<ProcessDescription> process_) {
+    process = std::move(process_);
+  }
+
+  void setPriorities(std::vector<std::unique_ptr<QID>> priorities_){
+    priorities = std::move(priorities_);
+  }
+
+
   /// LLVM style RTTI
   static bool classof(const Entity *c) { return c->getKind() == Entity_Actor; }
 
@@ -2537,6 +2555,7 @@ private:
   std::vector<std::unique_ptr<Expression>> invariants;
   std::vector<std::unique_ptr<Action>> actions;
   std::vector<std::unique_ptr<Action>> initializers;
+  std::unique_ptr<ProcessDescription> process;
   std::unique_ptr<Schedule> schedule;
   std::vector<std::unique_ptr<QID>> priorities;
 };

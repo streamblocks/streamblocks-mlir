@@ -228,7 +228,7 @@
 
 %type <std::unique_ptr<GeneratorVarDecl>> generator_var_decl
 
-%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt
+%type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt read_stmt
 
 %type <std::unique_ptr<StmtForeach>> foreach_header_stmt
 
@@ -252,7 +252,7 @@
 
 %type <std::vector<std::unique_ptr<Statement>>> stmts stmts.opt do_stmts.opt
 
-%type <std::unique_ptr<Action>> action
+%type <std::unique_ptr<Action>> action initialize
 
 %type <std::vector<std::unique_ptr<QID>>> priority prio_tag_list priority_clause priority_clauses.opt schedule_fsm_tags
 
@@ -261,6 +261,10 @@
 %type <std::unique_ptr<Transition>> schedule_fsm_transition
 
 %type <std::unique_ptr<RegExp>> schedule_alt_expression schedule_alt_expressions schedule_expression schedule_multiplicity_expression schedule_opt_expression schedule_seq_expression schedule_seq_expressions schedule_unary_expression schedule_var_expression
+
+%type <std::unique_ptr<CalActor>> actor actor_body actor_head
+
+%type <std::unique_ptr<ProcessDescription>> process_description
 
 %left ".."
 %left "||" "or"
@@ -316,7 +320,7 @@ namespace_decl_default :
 
 */
 
-namespace_decl_default: schedule
+namespace_decl_default: actor
                       ;
 
 
@@ -380,8 +384,10 @@ expr:
     |   "(" expr ")" {$$ = $2;}
     |   if_expr
     |   lambda_expr
+    |   proc_expr
     |   let_expr
     |   list_expr
+    |   set_expr
     ;
 
 var_expr:
@@ -715,8 +721,8 @@ global_var_decls.opt:
     ;
 
 global_var_decl:
-                                simple_var_decl {$$ = std::make_unique<GlobalVarDecl>(std::move($1), false,  Availability::PUBLIC);}
-    |                "external" simple_var_decl {$$ = std::make_unique<GlobalVarDecl>(std::move($2), true, Availability::PUBLIC);}
+                                simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($1), false,  Availability::PUBLIC);}
+    |                "external" simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($2), true, Availability::PUBLIC);}
     |   availability            simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1); }
     |   availability "external" simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1); }
     ;
@@ -735,8 +741,18 @@ local_var_decls:
     ;
 
 local_var_decl:
-        "external" simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($2), true); }
-    |              simple_var_decl  { $$ = std::make_unique<LocalVarDecl>(@$, std::move($1), false); }
+        "external" simple_var_decl
+        {
+            auto t = std::unique_ptr<LocalVarDecl>(static_cast<LocalVarDecl*>($2.release()));
+            t->setExternal(true);
+            $$ = std::move(t);
+        }
+    |              simple_var_decl
+        {
+            auto t = std::unique_ptr<LocalVarDecl>(static_cast<LocalVarDecl*>($1.release()));
+            t->setExternal(false);
+            $$ = std::move(t);
+        }
     ;
 
 generator_var_decl:
@@ -834,6 +850,12 @@ procedure_var_decl:
 
 /* LValue */
 
+%nterm <std::vector<std::unique_ptr<LValue>>> lvalues;
+lvalues:
+        lvalue { $$.push_back($1); }
+    |   lvalues "," lvalue  { $$=$1; $$.push_back($3); }
+    ;
+
 lvalue:
         lvalue_variable
     |   lvalue_field
@@ -861,6 +883,7 @@ stmt:
     |   block_stmt
     |   if_stmt
     |   while_stmt
+    |   read_stmt
     ;
 
 stmts:
@@ -926,6 +949,13 @@ while_stmt:
         }
     ;
 
+read_stmt:
+    port "-->" lvalues repeat.opt ";"
+    {
+        $$ = std::make_unique<StmtRead>(@$, std::move($1), std::move($3), std::move($4));
+    }
+    ;
+
 /*
 foreach_stmt:
     foreach_header_stmt "end" {$$=std::move($1);}
@@ -980,8 +1010,8 @@ multi.opt:
     ;
 
 port_input:
-        multi.opt ID {$$ = std::make_unique<PortDecl>(@$,std::unique_ptr<TypeExpr>(), $2);}
-    |   multi.opt type ID  {$$ = std::make_unique<PortDecl>(@$,std::move($2), $3);}
+        multi.opt ID {$$ = std::make_unique<PortDecl>(@$, $2, std::unique_ptr<TypeExpr>());}
+    |   multi.opt type ID  {$$ = std::make_unique<PortDecl>(@$, $3, std::move($2));}
 
 %nterm <std::vector<std::unique_ptr<PortDecl>>> port_inputs;
 port_inputs:
@@ -996,8 +1026,8 @@ port_inputs.opt:
     ;
 
 port_output:
-        multi.opt ID {$$ = std::make_unique<PortDecl>(@$,std::unique_ptr<TypeExpr>(), $2);}
-    |   multi.opt type ID  {$$ = std::make_unique<PortDecl>(@$,std::move($2), $3);}
+        multi.opt ID {$$ = std::make_unique<PortDecl>(@$, $2,std::unique_ptr<TypeExpr>());}
+    |   multi.opt type ID  {$$ = std::make_unique<PortDecl>(@$, $3, std::move($2));}
 
 %nterm <std::vector<std::unique_ptr<PortDecl>>> port_outputs;
 port_outputs:
@@ -1011,9 +1041,98 @@ port_outputs.opt:
     |   port_outputs { $$=$1; }
     ;
 
+time.opt:
+        %empty
+    |   "time" type
+    ;
 
-actor_head: "actor" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt
-;
+actor:
+    actor_body "end" {$$ = $1;}
+    ;
+
+actor_body:
+        actor_head {$$ = $1;}
+    |   actor_body ";" {$$ = $1;}
+    |   actor_body local_var_decl
+        {
+            auto actor = $1;
+            actor->addVarDecl($2);
+            $$ = std::move(actor);
+        }
+    |   actor_body initialize
+        {
+            auto actor = $1;
+
+            if(actor->getProcess() != nullptr){
+                error(@2, "A process description is already defined, you can not define an initializer action, or remove the process description!");
+            }
+
+            actor->addInitializer($2);
+            $$ = std::move(actor);
+        }
+    |   actor_body action
+        {
+            auto actor = $1;
+
+            if(actor->getProcess() != nullptr){
+                error(@2, "A process description is already defined, you can not define an action, or remove the process description!");
+            }
+
+            actor->addAction($2);
+            $$ = std::move(actor);
+        }
+    |   actor_body process_description
+            {
+                auto actor = $1;
+
+                if(!actor->getActions().empty()){
+                    error(@2, "A Cal actor should not contain actions if a process description is defined!");
+                }
+
+                if(!actor->getInitializers().empty()){
+                    error(@2, "A Cal actor should not contain an initializer action if a process description is defined!");
+                }
+
+                actor->setProcess($2);
+                $$ = std::move(actor);
+            }
+    |   actor_body schedule
+        {
+            auto actor = $1;
+            actor->setSchedule($2);
+            $$ = std::move(actor);
+        }
+    |   actor_body priority
+        {
+            auto actor = $1;
+            actor->setPriorities($2);
+            $$ = std::move(actor);
+        }
+    ;
+
+
+actor_head:
+    "actor" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
+    {
+        std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
+        std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters = $4;
+
+        $$ = std::make_unique<CalActor>(@$, $2, std::move($6), std::move($8),
+                std::move(typeParameters),
+                std::move(valueParameters));
+    }
+    ;
+
+process_description:
+        "repeat" stmts "end"
+        {
+            $$ = std::make_unique<ProcessDescription>(@$, std::move($2), true);
+        }
+    |   "do"     stmts "end"
+        {
+            $$ = std::make_unique<ProcessDescription>(@$, std::move($2), false);
+        }
+    ;
 
 /* Action */
 
@@ -1021,6 +1140,7 @@ actor_head: "actor" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>"
 decl_input:
     ID { $$ = std::make_unique<InputVarDecl>(@$, $1); }
     ;
+
 %nterm <std::vector<std::unique_ptr<InputVarDecl>>> decl_inputs;
 decl_inputs:
         decl_input { $$.push_back($1); }
@@ -1140,6 +1260,22 @@ action:
     }
     ;
 
+initialize:
+    action_qid "initialize" input_patterns.opt "==>" output_exprs.opt guards.opt delay.opt requires.opt ensures.opt var_decls.opt do_stmts.opt "end"
+    {
+        $$ = std::make_unique<Action>(@$,
+            std::vector<std::unique_ptr<Annotation>>(),
+            std::move($1),
+            std::move($3),
+            std::move($5),
+            std::vector<std::unique_ptr<TypeDecl>>(),
+            std::move($10),
+            std::move($6),
+            std::move($11),
+            std::move($7)
+        );
+    }
+    ;
 
 /* Priority */
 

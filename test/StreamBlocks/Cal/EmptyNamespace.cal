@@ -1,1 +1,9 @@
-schedule regexp (a b)+ end
+actor A() int a ==> int b:
+
+    int token;
+
+    repeat
+        a --> token repeat 64 ;
+    end
+
+end
