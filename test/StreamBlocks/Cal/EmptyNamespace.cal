@@ -3,8 +3,10 @@ actor A() int a ==> int b:
     int token;
 
     repeat
-        a --> token;
-        b <-- [i : for int i in 0 .. 5, i < 2];
+        foreach i in 0 .. 4 do
+            a --> token;
+            b <-- [i : for int i in 0 .. 5, i < 2];
+        end
     end
 
 end

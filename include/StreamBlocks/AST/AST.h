@@ -1911,12 +1911,10 @@ class StmtForeach : public Statement {
 public:
   StmtForeach(Location location,
               std::vector<std::unique_ptr<Annotation>> annotations,
-              std::unique_ptr<Generator> generator,
-              std::vector<std::unique_ptr<Expression>> filters,
+              std::vector<std::unique_ptr<Generator>> generators,
               std::vector<std::unique_ptr<Statement>> body)
       : Statement(Stmt_Foreach, location), annotations(std::move(annotations)),
-        generator(std::move(generator)), filters(std::move(filters)),
-        body(std::move(body)) {}
+        generators(std::move(generators)), body(std::move(body)) {}
 
   // TODO : Implement me
   std::unique_ptr<Statement> clone() const override {
@@ -1926,8 +1924,9 @@ public:
   llvm::ArrayRef<std::unique_ptr<Annotation>> getAnnotations() {
     return annotations;
   }
-  Generator *getGenerator() { return generator.get(); }
-  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
+  }
   llvm::ArrayRef<std::unique_ptr<Statement>> getStatement() { return body; }
 
   /// LLVM style RTTI
@@ -1937,8 +1936,7 @@ public:
 
 private:
   std::vector<std::unique_ptr<Annotation>> annotations;
-  std::unique_ptr<Generator> generator;
-  std::vector<std::unique_ptr<Expression>> filters;
+  std::vector<std::unique_ptr<Generator>> generators;
   std::vector<std::unique_ptr<Statement>> body;
 };
 

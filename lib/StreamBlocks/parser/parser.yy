@@ -205,7 +205,7 @@
 
 %type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr repeat.opt delay.opt generator_in.opt
 
-%type <std::string> unary_op label_opt
+%type <std::string> unary_op
 
 %type <std::unique_ptr<Parameter>> parameter_assignment type_parameter value_parameter
 
@@ -235,7 +235,7 @@
 
 %type <std::vector<std::unique_ptr<Statement>>> foreach_body_stmt
 
-%type <std::unique_ptr<Generator>> for_generator
+%type <std::unique_ptr<Generator>> for_generator foreach_generator
 
 %type <bool> multi.opt
 
@@ -583,6 +583,25 @@ for_generators:
         }
     ;
 
+%nterm <std::vector<std::unique_ptr<Generator>>> foreach_generators;
+foreach_generators:
+        foreach_generator
+        {
+            $$.push_back($1);
+        }
+    |   foreach_generators "," expr
+        {
+            std::vector<std::unique_ptr<Generator>> generators = $1;
+            int size = generators.size();
+            generators[size-1]->addFilter($3);
+            $$ = std::move(generators);
+        }
+    |   foreach_generators "," foreach_generator
+        {
+            $$=$1; $$.push_back($3);
+        }
+    ;
+
 generator_in.opt:
         %empty %prec SHIFT_THERE
         {
@@ -605,7 +624,16 @@ for_generator:
         }
     ;
 
-
+foreach_generator:
+        "foreach" generator_var_decls generator_in.opt
+        {
+            $$ = std::make_unique<Generator>(@$, std::unique_ptr<TypeExpr>(), std::move($2), std::move($3), std::vector<std::unique_ptr<Expression>>());
+        }
+    |   "foreach" type generator_var_decls generator_in.opt
+        {
+            $$ = std::make_unique<Generator>(@$, std::move($2), std::move($3), std::move($4), std::vector<std::unique_ptr<Expression>>());
+        }
+    ;
 
 
 
@@ -932,6 +960,7 @@ stmt:
     |   block_stmt
     |   if_stmt
     |   while_stmt
+    |   foreach_stmt
     |   read_stmt
     |   write_stmt
     ;
@@ -1013,9 +1042,22 @@ write_stmt:
     }
     ;
 
-/*
+
 foreach_stmt:
-    foreach_header_stmt "end" {$$=std::move($1);}
+    foreach_generators var_decls.opt "do" stmts "end"
+    {
+        auto generators = $1;
+        auto variables = $2;
+        auto stmts = $4;
+        if(variables.empty()){
+            $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generators), std::move(stmts));
+        } else {
+            std::unique_ptr<StmtBlock> body = std::make_unique<StmtBlock>(@3, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move(variables), std::move(stmts));
+            std::vector<std::unique_ptr<Statement>> newStmts;
+            newStmts.push_back(std::move(body));
+            $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generators), std::move(newStmts));
+        }
+    }
     ;
 
 foreach_header_stmt: "foreach" generator_var_decls "in" expr  foreach_body_stmt
@@ -1056,7 +1098,7 @@ foreach_body_stmt: "," foreach_header_stmt
                     $$ = std::move(stmts);
                  }
                  ;
-*/
+
 
 
 /* Actor */
