@@ -54,6 +54,7 @@ public:
     Expr_Let,
     Expr_List,
     Expr_Set,
+    Expr_Map,
     Expr_Proc,
     Expr_Tuple,
     Expr_TypeAssertion,
@@ -1423,6 +1424,37 @@ public:
 
 private:
   std::vector<std::unique_ptr<Expression>> elements;
+  std::vector<std::unique_ptr<Generator>> generators;
+};
+
+class ExprMap : public Expression {
+public:
+  ExprMap(Location location,
+          std::vector<std::pair<std::unique_ptr<Expression>,
+                                std::unique_ptr<Expression>>>
+              mappings,
+          std::vector<std::unique_ptr<Generator>> generators)
+      : Expression(Expr_Map, location), mappings(std::move(mappings)),
+        generators(std::move(generators)) {}
+
+  llvm::ArrayRef<
+      std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>>
+  getMappings() {
+    return mappings;
+  }
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
+  }
+
+  std::unique_ptr<Expression> clone() const override { return nullptr; }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) { return c->getKind() == Expr_Map; }
+
+private:
+  std::vector<
+      std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>>
+      mappings;
   std::vector<std::unique_ptr<Generator>> generators;
 };
 

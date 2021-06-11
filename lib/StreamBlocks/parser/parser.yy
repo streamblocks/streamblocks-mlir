@@ -203,7 +203,7 @@
 
 %type <std::unique_ptr<Import>> import single_import group_import
 
-%type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr repeat.opt delay.opt generator_in.opt
+%type <std::unique_ptr<Expression>> expr postfix_expr primary_expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr map_expr lambda_expr proc_expr application_expr repeat.opt delay.opt generator_in.opt
 
 %type <std::string> unary_op
 
@@ -230,10 +230,6 @@
 %type <std::unique_ptr<GeneratorVarDecl>> generator_var_decl
 
 %type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt read_stmt write_stmt
-
-%type <std::unique_ptr<StmtForeach>> foreach_header_stmt
-
-%type <std::vector<std::unique_ptr<Statement>>> foreach_body_stmt
 
 %type <std::unique_ptr<Generator>> for_generator foreach_generator
 
@@ -266,6 +262,8 @@
 %type <std::unique_ptr<CalActor>> actor actor_body actor_head
 
 %type <std::unique_ptr<ProcessDescription>> process_description
+
+%type <std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>> mapping
 
 %left ".."
 %left "||" "or"
@@ -374,21 +372,44 @@ imports:
 
 /* Expression */
 
+exprs:
+        expr { $$.push_back($1); }
+    |   exprs "," expr { $$=$1; $$.push_back($3); }
+    ;
+
+exprs.opt:
+        %empty {/* empty */}
+    |   exprs { $$=$1; }
+    ;
+
 expr:
-        var_expr
-    |   application_expr
-    |   literal_expr
-    |   unary_expr
+        unary_expr
     |   binary_expr
-    |   type_assertion_expr
-    |   tuple_expr
-    |   "(" expr ")" {$$ = $2;}
+    ;
+
+postfix_expr:
+        primary_expr
+    |   postfix_expr "[" exprs.opt "]"
+    |   postfix_expr "{" exprs.opt "}"
+    |   postfix_expr "." ID
+    ;
+
+primary_expr:
+        var_expr
+    |   literal_expr
     |   if_expr
     |   lambda_expr
     |   proc_expr
     |   let_expr
+    |   tuple_expr
     |   list_expr
     |   set_expr
+    |   map_expr
+    |   "(" expr ")" { $$ = $2; }
+    |   "(" expr "::" type ")"
+        {
+            $$ = std::make_unique<cal::ExprTypeAssertion>(@$, std::move($2), std::move($4));
+        }
     ;
 
 var_expr:
@@ -447,7 +468,11 @@ unary_op:
     ;
 
 unary_expr:
-    unary_op expr %prec "*" { $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2)); }
+        postfix_expr
+    |   unary_op postfix_expr
+        {
+            $$ = std::make_unique<cal::ExprUnary>(@$, $1, std::move($2));
+        }
     ;
 
 
@@ -468,24 +493,12 @@ tuple_expr:
         }
     ;
 
-type_assertion_expr:
-    "(" expr "::" type ")" { $$ = std::make_unique<cal::ExprTypeAssertion>(@$, std::move($2), std::move($4)); }
-    ;
 
 opt_comma:
         %empty
     |   ","
     ;
 
-exprs:
-        expr { $$.push_back($1); }
-    |   exprs "," expr { $$=$1; $$.push_back($3); }
-    ;
-
-exprs.opt:
-        %empty {/* empty */}
-    |   exprs { $$=$1; }
-    ;
 
 if_expr:
         "if" expr "then" expr elsif_expr "end"
@@ -551,6 +564,42 @@ set_expr:
     |   "{" exprs ":" for_generators "}"  { $$ = make_unique<ExprSet>(@$, std::move($2), std::move($4)); }
     ;
 
+map_expr:
+        "{" "}"
+        {
+            $$ = std::make_unique<ExprMap>(@$,
+                    std::vector<std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>>(),
+                    std::vector<std::unique_ptr<Generator>>()
+                    );
+        }
+    |   "{" mappings "}"
+        {
+            $$ = std::make_unique<ExprMap>(@$,
+                    std::move($2),
+                    std::vector<std::unique_ptr<Generator>>()
+                    );
+        }
+
+    |   "{" mappings ":" for_generators "}"
+        {
+            $$ = std::make_unique<ExprMap>(@$,
+                    std::move($2),
+                    std::move($4)
+                    );
+        }
+    ;
+
+mapping:
+    expr "->" expr
+    {
+        $$ = std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>(std::move($1), std::move($3));
+    }
+    ;
+%nterm <std::vector<std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>>> mappings;
+mappings:
+        mapping { $$.push_back($1); }
+    |   mappings "," mapping { $$=$1; $$.push_back($3); }
+    ;
 
 /* Generator */
 
@@ -1059,47 +1108,6 @@ foreach_stmt:
         }
     }
     ;
-
-foreach_header_stmt: "foreach" generator_var_decls "in" expr  foreach_body_stmt
-                   {
-                        auto generator = std::make_unique<Generator>(@2, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4));
-                        $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::vector<std::unique_ptr<Expression>>(), std::move($5));
-                   }
-                   | "foreach" type generator_var_decls "in" expr foreach_body_stmt
-                   {
-                        auto generator = std::make_unique<Generator>(@2, std::move($2), std::move($3), std::move($5));
-                        $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::vector<std::unique_ptr<Expression>>(), std::move($6));
-                   }
-                   | "foreach" generator_var_decls "in" expr "," exprs foreach_body_stmt
-                   {
-                       auto generator = std::make_unique<Generator>(@2, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4));
-                       $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::move($6), std::move($7));
-                   }
-                   | "foreach" type generator_var_decls "in" expr "," exprs foreach_body_stmt
-                   {
-                       auto generator = std::make_unique<Generator>(@2, std::move($2), std::move($3), std::move($5));
-                       $$ = std::make_unique<StmtForeach>(@$, std::vector<std::unique_ptr<Annotation>>(), std::move(generator), std::move($7), std::move($8));
-                   }
-                   ;
-
-
-foreach_body_stmt: "," foreach_header_stmt
-                 {
-                    std::vector<std::unique_ptr<Statement>> stmts;
-                    stmts.push_back(std::move($2));
-                    $$ = std::move(stmts);
-                 }
-                 | "do" stmts.opt { $$ = $2;}
-                 | "var" block_var_decls "do" stmts.opt
-                 {
-                    std::unique_ptr<StmtBlock> body = std::make_unique<StmtBlock>(@$, std::vector<std::unique_ptr<Annotation>>(), std::vector<std::unique_ptr<TypeDecl>>(), std::move($2), std::move($4));
-                    std::vector<std::unique_ptr<Statement>> stmts;
-                    stmts.push_back(std::move(body));
-                    $$ = std::move(stmts);
-                 }
-                 ;
-
-
 
 /* Actor */
 

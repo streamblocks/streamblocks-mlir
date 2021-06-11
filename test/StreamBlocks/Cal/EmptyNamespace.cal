@@ -5,7 +5,7 @@ actor A() int a ==> int b:
     repeat
         foreach i in 0 .. 4 do
             a --> token;
-            b <-- [i : for int i in 0 .. 5, i < 2];
+            b <-- {"a" -> 5, "b" -> 6 : for i in 0 .. 5};
         end
     end
 
