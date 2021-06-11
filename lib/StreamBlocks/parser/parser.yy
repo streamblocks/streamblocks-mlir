@@ -203,7 +203,7 @@
 
 %type <std::unique_ptr<Import>> import single_import group_import
 
-%type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr repeat.opt delay.opt
+%type <std::unique_ptr<Expression>> expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr lambda_expr proc_expr type_assertion_expr application_expr repeat.opt delay.opt generator_in.opt
 
 %type <std::string> unary_op label_opt
 
@@ -282,7 +282,7 @@
 
 %nonassoc "if"
 %nonassoc "else"
-
+%nonassoc SHIFT_THERE
 %nonassoc ","
 
 %%
@@ -552,18 +552,62 @@ set_expr:
     ;
 
 
-/* Filters are not implemented */
-for_generator:
-        "for" generator_var_decls "in" expr {$$ = std::make_unique<Generator>(@$, std::unique_ptr<TypeExpr>(), std::move($2), std::move($4), std::vector<std::unique_ptr<Expression>>());}
-    |   "for" type generator_var_decls "in" expr {$$ = std::make_unique<Generator>(@$, std::move($2), std::move($3), std::move($5), std::vector<std::unique_ptr<Expression>>());}
+/* Generator */
+
+generator_var_decl:
+    ID { $$ = std::make_unique<GeneratorVarDecl>(@$, $1); }
     ;
 
+%nterm <std::vector<std::unique_ptr<GeneratorVarDecl>>> generator_var_decls;
+generator_var_decls:
+        generator_var_decl { $$.push_back($1); }
+    |   generator_var_decls "," generator_var_decl { $$=$1; $$.push_back($3); }
+    ;
 
 %nterm <std::vector<std::unique_ptr<Generator>>> for_generators;
 for_generators:
-        for_generator { $$.push_back($1); }
-    |   for_generators "," for_generator { $$=$1; $$.push_back($3); }
+        for_generator
+        {
+            $$.push_back($1);
+        }
+    |   for_generators "," expr
+        {
+            std::vector<std::unique_ptr<Generator>> generators = $1;
+            int size = generators.size();
+            generators[size-1]->addFilter($3);
+            $$ = std::move(generators);
+        }
+    |   for_generators "," for_generator
+        {
+            $$=$1; $$.push_back($3);
+        }
     ;
+
+generator_in.opt:
+        %empty %prec SHIFT_THERE
+        {
+            $$ = std::unique_ptr<Expression>();
+        }
+    |   "in" expr
+        {
+            $$ = $2;
+    }
+    ;
+
+for_generator:
+        "for" generator_var_decls generator_in.opt
+        {
+            $$ = std::make_unique<Generator>(@$, std::unique_ptr<TypeExpr>(), std::move($2), std::move($3), std::vector<std::unique_ptr<Expression>>());
+        }
+    |   "for" type generator_var_decls generator_in.opt
+        {
+            $$ = std::make_unique<Generator>(@$, std::move($2), std::move($3), std::move($4), std::vector<std::unique_ptr<Expression>>());
+        }
+    ;
+
+
+
+
 
 
 /* Types */
@@ -722,10 +766,22 @@ global_var_decls.opt:
     ;
 
 global_var_decl:
-                                simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($1), false,  Availability::PUBLIC);}
-    |                "external" simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($2), true, Availability::PUBLIC);}
-    |   availability            simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1); }
-    |   availability "external" simple_var_decl { $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1); }
+                                simple_var_decl
+        {
+            $$ = std::make_unique<GlobalVarDecl>(std::move($1), false,  Availability::PUBLIC);
+        }
+    |                "external" simple_var_decl
+        {
+            $$ = std::make_unique<GlobalVarDecl>(std::move($2), true, Availability::PUBLIC);
+        }
+    |   availability            simple_var_decl
+        {
+            $$ = std::make_unique<GlobalVarDecl>(std::move($2), false, $1);
+        }
+    |   availability "external" simple_var_decl
+        {
+            $$ = std::make_unique<GlobalVarDecl>(std::move($3), true,  $1);
+        }
     ;
 
 
@@ -756,15 +812,7 @@ local_var_decl:
         }
     ;
 
-generator_var_decl:
-    ID { $$ = std::make_unique<GeneratorVarDecl>(@$, $1); }
-    ;
 
-%nterm <std::vector<std::unique_ptr<GeneratorVarDecl>>> generator_var_decls;
-generator_var_decls:
-        generator_var_decl { $$.push_back($1); }
-    |   generator_var_decls "," generator_var_decl { $$=$1; $$.push_back($3); }
-    ;
 
 simple_var_decl:
         variable_var_decl ";"

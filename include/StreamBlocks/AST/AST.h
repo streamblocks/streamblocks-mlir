@@ -32,7 +32,6 @@ using Location = cal::location;
 
 namespace cal {
 
-class Pattern;
 class Entity;
 
 class Expression {
@@ -103,6 +102,34 @@ public:
 
 private:
   const StatementKind kind;
+  Location location;
+};
+
+/// Base class for all patterns nodes.
+class Pattern {
+public:
+  enum PatternKind {
+    Pattern_Alias,
+    Pattern_Alternative,
+    Pattern_Binding,
+    Pattern_Wildcard,
+    Pattern_Deconstruction,
+    Pattern_Expression,
+    Pattern_List,
+    Pattern_Literal,
+    Pattern_Tuple,
+    Pattern_Variable
+  };
+  Pattern(PatternKind kind, Location location)
+      : kind(kind), location(location) {}
+  virtual ~Pattern() = default;
+
+  PatternKind getKind() const { return kind; }
+
+  const Location &loc() { return location; }
+
+private:
+  const PatternKind kind;
   Location location;
 };
 
@@ -201,18 +228,14 @@ public:
         constant, external);
   }
 
-  TypeExpr *getType()  { return type.get(); }
+  TypeExpr *getType() { return type.get(); }
   Expression *getValue() { return value.get(); }
-  bool getConstant()  { return constant; }
-  bool getExternal()  { return external; }
+  bool getConstant() { return constant; }
+  bool getExternal() { return external; }
 
-  void setConstant(bool value){
-    constant = value;
-  }
+  void setConstant(bool value) { constant = value; }
 
-  void setExternal(bool value){
-    external = value;
-  }
+  void setExternal(bool value) { external = value; }
 
   static bool classof(const Parameter *c) {
     return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
@@ -235,7 +258,6 @@ public:
                                               llvm::Twine(getName()).str());
   }
 };
-
 
 class AnnotationParameter {
 public:
@@ -320,6 +342,10 @@ public:
     return std::make_unique<Generator>(
         loc(), type->clone(), std::move(tovVarDecls), collection->clone(),
         std::move(toFilters));
+  }
+
+  void addFilter(std::unique_ptr<Expression> filter) {
+    filters.push_back(std::move(filter));
   }
 
   const Location &loc() const { return location; }
@@ -1596,34 +1622,6 @@ private:
   std::unique_ptr<Expression> index;
 };
 
-/// Base class for all patterns nodes.
-class Pattern {
-public:
-  enum PatternKind {
-    Pattern_Alias,
-    Pattern_Alternative,
-    Pattern_Binding,
-    Pattern_Wildcard,
-    Pattern_Deconstruction,
-    Pattern_Expression,
-    Pattern_List,
-    Pattern_Literal,
-    Pattern_Tuple,
-    Pattern_Variable
-  };
-  Pattern(PatternKind kind, Location location)
-      : kind(kind), location(location) {}
-  virtual ~Pattern() = default;
-
-  PatternKind getKind() const { return kind; }
-
-  const Location &loc() { return location; }
-
-private:
-  const PatternKind kind;
-  Location location;
-};
-
 class PatternAlias : public Pattern {
 public:
   PatternAlias(Location location, std::unique_ptr<Pattern> alias,
@@ -2457,8 +2455,6 @@ private:
   std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
 };
 
-
-
 class CalActor : public Entity {
 public:
   CalActor(Location location, std::string name,
@@ -2480,8 +2476,8 @@ public:
                std::move(typeParameters), std::move(valueParameters)),
         varDecls(std::move(varDecls)), typeDecls(std::move(typeDecls)),
         invariants(std::move(invariants)), actions(std::move(actions)),
-        initializers(std::move(initializers)), process(std::move(process)), schedule(std::move(schedule)),
-        priorities(std::move(priorities)) {}
+        initializers(std::move(initializers)), process(std::move(process)),
+        schedule(std::move(schedule)), priorities(std::move(priorities)) {}
 
   CalActor(Location location, std::string name,
            std::vector<std::unique_ptr<PortDecl>> inputPorts,
@@ -2541,10 +2537,9 @@ public:
     process = std::move(process_);
   }
 
-  void setPriorities(std::vector<std::unique_ptr<QID>> priorities_){
+  void setPriorities(std::vector<std::unique_ptr<QID>> priorities_) {
     priorities = std::move(priorities_);
   }
-
 
   /// LLVM style RTTI
   static bool classof(const Entity *c) { return c->getKind() == Entity_Actor; }

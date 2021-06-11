@@ -4,7 +4,7 @@ actor A() int a ==> int b:
 
     repeat
         a --> token;
-        b <-- token;
+        b <-- [i : for int i in 0 .. 5, i < 2];
     end
 
 end
