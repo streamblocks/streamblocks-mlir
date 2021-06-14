@@ -170,6 +170,7 @@ SPTAB         [ \t]
 "action" { return cal::CalParser::make_ACTION(loc); }
 "actor" { return cal::CalParser::make_ACTOR(loc); }
 "all" { return cal::CalParser::make_ALL(loc); }
+"alias" { return cal::CalParser::make_ALIAS(loc); }
 "any" { return cal::CalParser::make_ANY(loc); }
 "assign" { return cal::CalParser::make_ASSIGN(loc); }
 "at" { return cal::CalParser::make_AT(loc); }

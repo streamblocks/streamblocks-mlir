@@ -267,6 +267,8 @@
 
 %type <std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>> mapping
 
+%type <std::unique_ptr<GlobalTypeDecl>> alias_type global_type_decl
+
 %left ".."
 %left "||" "or"
 %left "&&" "and"
@@ -329,6 +331,12 @@ namespace_decl_default :
             auto ns = $1;
             ns->addImport($2);
             $$ = std::move(ns);
+        }
+    |   namespace_decl_default global_type_decl
+        {
+           auto ns = $1;
+           ns->addTypeDecl($2);
+           $$ = std::move(ns);
         }
     |   namespace_decl_default global_var_decl
         {
@@ -773,6 +781,23 @@ value_parameter:
 type_parameter:
         "type" ":" type {$$ = std::make_unique<TypeParameter>(@$, "type", std::move($3));}
     |   ID     ":" type {$$ = std::make_unique<TypeParameter>(@$, $1,     std::move($3));}
+    ;
+
+/* Global Type declaration */
+
+global_type_decl:
+        alias_type
+    ;
+
+alias_type:
+                     "alias" ID ":" type "end"
+        {
+            $$ = std::make_unique<AliasTypeDecl>(@$, $2, Availability::PUBLIC, std::move($4));
+        }
+    |   availability "alias" ID ":" type "end"
+        {
+            $$ = std::make_unique<AliasTypeDecl>(@$, $3, $1, std::move($5));
+        }
     ;
 
 /* Variable Declaration */

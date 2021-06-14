@@ -1,12 +1,13 @@
+alias T : int end
 
-actor A() int a ==> int b:
+actor A() T a ==> T b:
 
     int token;
 
     repeat
         foreach i in 0 .. 4 do
             a --> token;
-            b <-- {"a" -> 5, "b" -> 6 : for i in 0 .. 5};
+            b <-- token;
         end
     end
 
