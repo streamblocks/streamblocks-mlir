@@ -1,14 +1,37 @@
-alias T : int end
+namespace test:
 
-actor A() T a ==> T b:
+    actor Source() ==> int O:
 
-    int token;
+        int Counter := 0;
 
-    repeat
-        foreach i in 0 .. 4 do
-            a --> token;
-            b <-- token;
+        action ==> O:[token]
+        guard
+            Counter < 16
+        var
+            int token = Counter
+        do
+            Counter := Counter + 1;
         end
+
     end
+
+    actor Sink() int I ==> :
+
+        action I:[token] ==>
+        do
+            println(token);
+        end
+
+    end
+
+    network SourceSink() ==> :
+
+        entities
+            source = Source();
+            sink   = Sink();
+        structure
+            source.O --> sink.I;
+    end
+
 
 end

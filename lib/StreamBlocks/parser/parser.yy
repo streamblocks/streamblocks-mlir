@@ -219,7 +219,7 @@
 
 %type <std::unique_ptr<VarDecl>> simple_var_decl variable_var_decl function_var_decl procedure_var_decl
 
-%type <std::unique_ptr<LocalVarDecl>> local_var_decl block_var_decl
+%type <std::unique_ptr<LocalVarDecl>> local_var_decl block_var_decl network_var_decl
 
 %type <std::unique_ptr<GlobalVarDecl>> global_var_decl
 
@@ -243,7 +243,7 @@
 
 %type <std::unique_ptr<OutputExpression>> output_expr
 
-%type <std::vector<std::unique_ptr<Expression>>> guards.opt exprs exprs.opt
+%type <std::vector<std::unique_ptr<Expression>>> guards.opt exprs exprs.opt indices.opt indices
 
 %type <std::vector<std::unique_ptr<Statement>>> stmts stmts.opt do_stmts.opt
 
@@ -259,7 +259,19 @@
 
 %type <std::unique_ptr<CalActor>> actor actor_body actor_head
 
+%type <std::unique_ptr<NLNetwork>> network network_body network_head
+
 %type <std::unique_ptr<Entity>> global_entity
+
+%type <std::unique_ptr<InstanceDecl>> entity_decl
+
+%type <std::unique_ptr<EntityExpr>> entity_expr
+
+%type <std::unique_ptr<StructureStmt>> structure_stmt structure_basic structure_cond structure_foreach
+
+%type <std::unique_ptr<PortReference>> port_reference
+
+%type <std::unique_ptr<ToolAttribute>> attribute
 
 %type <std::unique_ptr<GlobalEntityDecl>> global_entity_decl
 
@@ -268,6 +280,16 @@
 %type <std::pair<std::unique_ptr<Expression>, std::unique_ptr<Expression>>> mapping
 
 %type <std::unique_ptr<GlobalTypeDecl>> alias_type global_type_decl
+
+%type <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls section_vars network_var_decls
+
+%type <std::vector<std::unique_ptr<InstanceDecl>>> section_entities entity_decls.opt entity_decls
+
+%type <std::vector<std::unique_ptr<ToolAttribute>>> attributes.opt attributes
+
+%type <std::vector<std::unique_ptr<StructureStmt>>> structure_stmts structure_stmts.opt section_structure
+
+
 
 %left ".."
 %left "||" "or"
@@ -764,8 +786,27 @@ lambda_type:
 
 %nterm <std::vector<std::unique_ptr<Parameter>>> parameter_assignments;
 parameter_assignments:
-        parameter_assignment { $$.push_back($1); }
-    |   parameter_assignments "," parameter_assignment { $$=$1; $$.push_back($3); }
+        parameter_assignment
+        {
+            $$.push_back($1);
+        }
+    |   parameter_assignments "," parameter_assignment
+        {
+            $$=$1;
+            $$.push_back($3);
+        }
+    ;
+
+%nterm <std::vector<std::unique_ptr<Parameter>>> parameter_assignments.opt;
+parameter_assignments.opt:
+        %empty
+        {
+            $$ = std::vector<std::unique_ptr<Parameter>>();
+        }
+    |   parameter_assignments
+        {
+            $$=$1;
+        }
     ;
 
 
@@ -838,16 +879,9 @@ availability:
     ;
 
 
-%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls_plus;
-block_var_decls_plus:
-        block_var_decl { $$.push_back($1); }
-    |   block_var_decls_plus "," block_var_decl { $$=$1; $$.push_back($3); }
-    ;
-
-%nterm <std::vector<std::unique_ptr<LocalVarDecl>>> block_var_decls;
 block_var_decls:
-        %empty { /* empty list */ }
-   |    block_var_decls_plus{ $$=$1; }
+        block_var_decl { $$.push_back($1); }
+    |   block_var_decls "," block_var_decl { $$=$1; $$.push_back($3); }
     ;
 
 block_var_decl:
@@ -1133,7 +1167,8 @@ foreach_stmt:
     }
     ;
 
-/* Actor */
+
+/* Entity Ports */
 
 multi.opt:
         %empty {$$ = false;}
@@ -1171,6 +1206,314 @@ port_outputs.opt:
         %empty {/* empty */}
     |   port_outputs { $$=$1; }
     ;
+
+/* Network */
+
+network:
+    network_body "end"
+    {
+        $$ = $1;
+    }
+    ;
+
+network_body:
+        network_head
+        {
+            $$ = $1;
+        }
+    |   network_body section_vars
+         {
+            auto network = $1;
+            network->addVarDecls($2);
+            $$ = std::move(network);
+        }
+    |   network_body section_entities
+        {
+            auto network = $1;
+            network->addEntities($2);
+            $$ = std::move(network);
+        }
+    |   network_body section_structure
+        {
+            auto network = $1;
+            network->addStructure($2);
+            $$ = std::move(network);
+        }
+    ;
+
+network_head:
+    "network" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
+    {
+        std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
+        std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters = $4;
+
+        $$ = std::make_unique<NLNetwork>(@$, $2, std::move($6), std::move($8),
+                std::move(typeParameters),
+                std::move(valueParameters));
+    }
+    ;
+
+section_vars:
+    "var" network_var_decls {$$ = $2;}
+    ;
+
+network_var_decls:
+        network_var_decl
+        {
+            $$.push_back($1);
+        }
+    |   network_var_decls network_var_decl
+        {
+            $$=$1;
+            $$.push_back($2);
+        }
+    ;
+
+network_var_decl:
+        variable_var_decl ";"
+        {
+            auto t = std::unique_ptr<LocalVarDecl>(static_cast<LocalVarDecl*>($1.release()));
+            t->setExternal(false);
+            $$ = std::move(t);
+        }
+    |   function_var_decl
+        {
+            auto t = std::unique_ptr<LocalVarDecl>(static_cast<LocalVarDecl*>($1.release()));
+            t->setExternal(false);
+            $$ = std::move(t);
+        }
+    ;
+
+section_entities:
+    "entities"  entity_decls.opt { $$ = $2; }
+    ;
+
+entity_decls.opt:
+        %empty
+        {
+            $$ = std::vector<std::unique_ptr<InstanceDecl>>();
+        }
+    |   entity_decls
+        {
+            $$ = $1;
+        }
+    ;
+
+entity_decls:
+        entity_decl
+        {
+            $$.push_back($1);
+        }
+    |   entity_decls entity_decl
+        {
+            $$=$1;
+            $$.push_back($2);
+        }
+    ;
+
+entity_decl:
+    ID dimensions.opt "=" entity_expr ";"
+    {
+        $$ = std::make_unique<InstanceDecl>(@$, $1, std::move($4));
+    }
+    ;
+
+dimensions.opt:
+        %empty
+    |   dimensions
+    ;
+
+dimensions:
+        dimension
+    |   dimensions dimension
+    ;
+
+dimension:
+        "[" "]"
+    |   "[" expr "]"
+    ;
+
+entity_expr:
+        ID "(" parameter_assignments.opt ")" attributes.opt
+        {
+            std::vector<std::unique_ptr<TypeParameter>> types;
+            std::vector<std::unique_ptr<ValueParameter>> values;
+
+            std::vector<std::unique_ptr<Parameter>> parameters = $3;
+
+            for (auto& item : parameters) {
+                if(item->getKind() == cal::Parameter::ParameterKind::Param_Type){
+                    auto t = std::unique_ptr<cal::TypeParameter>(static_cast<cal::TypeParameter*>(item.release()));
+                    types.push_back(std::move(t));
+                }else{
+                    auto t = std::unique_ptr<cal::ValueParameter>(static_cast<cal::ValueParameter*>(item.release()));
+                    values.push_back(std::move(t));
+                }
+            }
+
+            auto entityRef = std::make_unique<EntityRefLocal>(@1, $1);
+
+            $$ = make_unique<EntityInstanceExpr>(@$, std::move(entityRef), std::move(types), std::move(values), std::move($5));
+
+        }
+    |   "if" expr "then" entity_expr "else" entity_expr "end"
+        {
+            $$ = std::make_unique<EntityIfExpr>(@$, std::move($2), std::move($4), std::move($6));
+        }
+    |   "[" entity_exprs "]"
+        {
+            $$ = std::make_unique<EntityListExpr>(@$, std::move($2), std::vector<std::unique_ptr<Generator>>());
+        }
+    |   "[" entity_exprs ":" for_generators "]"
+        {
+            $$ = std::make_unique<EntityListExpr>(@$, std::move($2), std::move($4));
+        }
+    ;
+
+%nterm <std::vector<std::unique_ptr<EntityExpr>>> entity_exprs;
+entity_exprs:
+        entity_expr
+        {
+            $$.push_back($1);
+        }
+    |   entity_exprs "," entity_expr
+        {
+            $$=$1;
+            $$.push_back($3);
+        }
+    ;
+
+
+section_structure:
+    "structure" structure_stmts.opt
+    {
+        $$ = $2;
+    }
+    ;
+
+structure_stmts.opt:
+        %empty
+        {
+            $$ = std::vector<std::unique_ptr<StructureStmt>>();
+        }
+    |   structure_stmts
+        {
+            $$ = $1;
+        }
+    ;
+
+structure_stmts:
+        structure_stmt
+        {
+            $$.push_back($1);
+        }
+    |   structure_stmts structure_stmt
+        {
+            $$=$1;
+            $$.push_back($2);
+        }
+    ;
+
+structure_stmt:
+        structure_basic
+    |   structure_cond
+    |   structure_foreach
+    ;
+
+structure_basic:
+    port_reference "-->" port_reference attributes.opt ";"
+    {
+        $$ = std::make_unique<StructureConnectionStmt>(@$, std::move($1), std::move($3), std::move($4));
+    }
+    ;
+
+port_reference:
+        ID
+        {
+            $$ = std::make_unique<PortReference>(@$, nullptr, std::vector<std::unique_ptr<Expression>>(), $1);
+        }
+    |   ID indices.opt "." ID
+        {
+            $$ = std::make_unique<PortReference>(@$, $1, std::move($2), $4);
+        }
+    ;
+
+indices.opt:
+        %empty
+        {
+            $$ = std::vector<std::unique_ptr<Expression>>();
+        }
+    |   indices
+        {
+            $$ = $1;
+        }
+    ;
+
+indices:
+        "[" expr "]"
+        {
+            $$.push_back($2);
+        }
+    |   indices "[" expr "]"
+        {
+            $$=$1;
+            $$.push_back($3);
+        }
+    ;
+
+attributes.opt:
+        %empty
+        {
+            $$ = std::vector<std::unique_ptr<ToolAttribute>>();
+        }
+    |   "{" attributes "}"
+        {
+            $$ = $2;
+        }
+    ;
+
+attributes:
+        attribute
+        {
+            $$.push_back($1);
+        }
+    |   attributes attribute
+        {
+            $$=$1;
+            $$.push_back($2);
+        }
+    ;
+
+attribute:
+        ID "=" expr ";"
+        {
+            $$ = std::make_unique<ToolValueAttribute>(@$, $1, std::move($3));
+        }
+    |   ID  ":" type ";"
+        {
+            $$ = std::make_unique<ToolTypeAttribute>(@$, $1, std::move($3));
+        }
+    ;
+
+structure_cond:
+        "if" expr "then" structure_stmts.opt "end"
+        {
+            $$ = std::make_unique<StructureIfStmt>(@$, std::move($2), std::move($4), std::vector<std::unique_ptr<StructureStmt>>());
+        }
+    |   "if" expr "then" structure_stmts.opt "else" structure_stmts.opt "end"
+        {
+            $$ = std::make_unique<StructureIfStmt>(@$, std::move($2), std::move($4), std::move($6));
+        }
+    ;
+
+structure_foreach:
+    foreach_generators "do" structure_stmts "end"
+    {
+        $$ = std::make_unique<StructureForeachStmt>(@$, std::move($1), std::move($3));
+    }
+    ;
+
+/* Actor */
 
 time.opt:
         %empty
@@ -1266,11 +1609,16 @@ process_description:
     ;
 
 global_entity:
-    actor
-    {
-        auto entity = std::unique_ptr<Entity>(static_cast<Entity*>($1.release()));
-        $$ = std::move(entity);
-    }
+        actor
+        {
+            auto entity = std::unique_ptr<Entity>(static_cast<Entity*>($1.release()));
+            $$ = std::move(entity);
+        }
+    |   network
+        {
+            auto entity = std::unique_ptr<Entity>(static_cast<Entity*>($1.release()));
+            $$ = std::move(entity);
+        }
     ;
 
 global_entity_decl:

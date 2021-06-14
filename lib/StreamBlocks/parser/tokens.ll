@@ -201,6 +201,7 @@ SPTAB         [ \t]
 "endproc" { return cal::CalParser::make_ENDPROC(loc); }
 "endprocedure" { return cal::CalParser::make_ENDPROCEDURE(loc); }
 "endschedule" { return cal::CalParser::make_ENDSCHEDULE(loc); }
+"entities" { return cal::CalParser::make_ENTITIES(loc); }
 "endwhile" { return cal::CalParser::make_ENDWHILE(loc); }
 "ensure" { return cal::CalParser::make_ENSURE(loc); }
 "external" { return cal::CalParser::make_EXTERNAL(loc); }
@@ -221,6 +222,7 @@ SPTAB         [ \t]
 "multi" { return cal::CalParser::make_MULTI(loc); }
 "mutable" { return cal::CalParser::make_MUTABLE(loc); }
 "namespace" { return cal::CalParser::make_NAMESPACE(loc); }
+"network" { return cal::CalParser::make_NETWORK(loc); }
 "null" { return cal::CalParser::make_NULL(loc); }
 "old" { return cal::CalParser::make_OLD(loc); }
 "package" { return cal::CalParser::make_PACKAGE(loc); }
@@ -233,6 +235,7 @@ SPTAB         [ \t]
 "repeat" { return cal::CalParser::make_REPEAT(loc); }
 "require" { return cal::CalParser::make_REQUIRE(loc); }
 "schedule" { return cal::CalParser::make_SCHEDULE(loc); }
+"structure" { return cal::CalParser::make_STRUCTURE(loc); }
 "then" { return cal::CalParser::make_THEN(loc); }
 "time" { return cal::CalParser::make_TIME(loc); }
 "to" { return cal::CalParser::make_TO(loc); }

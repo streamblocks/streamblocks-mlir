@@ -32,8 +32,6 @@ using Location = cal::location;
 
 namespace cal {
 
-class Entity;
-
 class Expression {
 public:
   enum ExpressionKind {
@@ -61,8 +59,10 @@ public:
     Expr_TypeConstruction,
     Expr_Case
   };
+
   Expression(ExpressionKind kind, Location location)
       : kind(kind), location(location) {}
+
   virtual ~Expression() = default;
 
   virtual std::unique_ptr<Expression> clone() const = 0;
@@ -297,6 +297,103 @@ private:
   std::vector<std::unique_ptr<AnnotationParameter>> parameters;
 };
 
+class PortDecl : public Decl {
+public:
+  PortDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type)
+      : Decl(Decl_Port, location, name), type(std::move(type)) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<PortDecl>(loc(), llvm::Twine(getName()).str(),
+                                      type->clone());
+  }
+
+private:
+  TypeExpr *getType() { return type.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Decl *c) { return c->getKind() == Decl_Port; }
+
+private:
+  std::unique_ptr<TypeExpr> type;
+};
+
+class TypeDecl : public Decl {
+public:
+  TypeDecl(Location location, std::string name)
+      : Decl(Decl_Type, location, name) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<TypeDecl>(loc(), llvm::Twine(getName()).str());
+  }
+
+  static bool classof(const Parameter *c) {
+    return c->getKind() >= Decl_Type && c->getKind() <= Decl_Parameter_Type;
+  }
+};
+
+class ParameterTypeDecl : public TypeDecl {
+public:
+  ParameterTypeDecl(Location location, std::string name)
+      : TypeDecl(location, name) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<ParameterTypeDecl>(loc(),
+                                               llvm::Twine(getName()).str());
+  }
+};
+
+class ParameterVarDecl : public VarDecl {
+public:
+  ParameterVarDecl(Location location, std::string name,
+                   std::unique_ptr<TypeExpr> type,
+                   std::unique_ptr<Expression> value)
+      : VarDecl(location, name, std::move(type), std::move(value), false,
+                false) {}
+
+  std::unique_ptr<Decl> clone() const override {
+    return std::make_unique<ParameterVarDecl>(
+        loc(), llvm::Twine(getName()).str(),
+        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
+        value != nullptr ? value->clone() : std::unique_ptr<Expression>());
+  }
+};
+
+/// Base class for all Entity nodes.
+class Entity {
+public:
+  enum EntityKind { Entity_Actor, Entity_Network, Entity_AM };
+
+  Entity(EntityKind kind, Location location, std::string name,
+         std::vector<std::unique_ptr<Annotation>> annotations,
+         std::vector<std::unique_ptr<PortDecl>> inputPorts,
+         std::vector<std::unique_ptr<PortDecl>> outputPorts,
+         std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+         std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters)
+      : kind(kind), location(location), name(name),
+        annotations(std::move(annotations)), inputPorts(std::move(inputPorts)),
+        outputPorts(std::move(outputPorts)),
+        typeParameters(std::move(typeParameters)),
+        valueParameters(std::move(valueParameters)) {}
+
+  virtual ~Entity() = default;
+
+  EntityKind getKind() const { return kind; }
+
+  llvm::StringRef getName() { return name; }
+
+  const Location &loc() { return location; }
+
+private:
+  const EntityKind kind;
+  Location location;
+  std::string name;
+  std::vector<std::unique_ptr<Annotation>> annotations;
+  std::vector<std::unique_ptr<PortDecl>> inputPorts;
+  std::vector<std::unique_ptr<PortDecl>> outputPorts;
+  std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
+  std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
+};
+
 class Field {
 public:
   Field(Location location, std::string name) : location(location), name(name) {}
@@ -451,20 +548,6 @@ public:
   virtual Availability getAvailability() const = 0;
 };
 
-class TypeDecl : public Decl {
-public:
-  TypeDecl(Location location, std::string name)
-      : Decl(Decl_Type, location, name) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<TypeDecl>(loc(), llvm::Twine(getName()).str());
-  }
-
-  static bool classof(const Parameter *c) {
-    return c->getKind() >= Decl_Type && c->getKind() <= Decl_Parameter_Type;
-  }
-};
-
 class GlobalTypeDecl : public TypeDecl, GlobalDecl {
 public:
   GlobalTypeDecl(Location location, std::string name,
@@ -524,17 +607,6 @@ private:
   std::unique_ptr<Entity> entity;
   const Availability availability;
   const bool external;
-};
-
-class ParameterTypeDecl : public TypeDecl {
-public:
-  ParameterTypeDecl(Location location, std::string name)
-      : TypeDecl(location, name) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<ParameterTypeDecl>(loc(),
-                                               llvm::Twine(getName()).str());
-  }
 };
 
 class FieldDecl : public VarDecl {
@@ -606,22 +678,6 @@ public:
   }
 };
 
-class ParameterVarDecl : public VarDecl {
-public:
-  ParameterVarDecl(Location location, std::string name,
-                   std::unique_ptr<TypeExpr> type,
-                   std::unique_ptr<Expression> value)
-      : VarDecl(location, name, std::move(type), std::move(value), false,
-                false) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<ParameterVarDecl>(
-        loc(), llvm::Twine(getName()).str(),
-        type != nullptr ? type->clone() : std::unique_ptr<TypeExpr>(),
-        value != nullptr ? value->clone() : std::unique_ptr<Expression>());
-  }
-};
-
 class PatternVarDecl : public VarDecl {
 public:
   PatternVarDecl(Location location, std::string name)
@@ -631,26 +687,6 @@ public:
     return std::make_unique<PatternVarDecl>(loc(),
                                             llvm::Twine(getName()).str());
   }
-};
-
-class PortDecl : public Decl {
-public:
-  PortDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type)
-      : Decl(Decl_Port, location, name), type(std::move(type)) {}
-
-  std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<PortDecl>(loc(), llvm::Twine(getName()).str(),
-                                      type->clone());
-  }
-
-private:
-  TypeExpr *getType() { return type.get(); }
-
-  /// LLVM style RTTI
-  static bool classof(const Decl *c) { return c->getKind() == Decl_Port; }
-
-private:
-  std::unique_ptr<TypeExpr> type;
 };
 
 class VariantDecl : public Decl {
@@ -2451,42 +2487,6 @@ private:
   std::unique_ptr<RegExp> regexp;
 };
 
-/// Base class for all Entity nodes.
-class Entity {
-public:
-  enum EntityKind { Entity_Actor, Entity_Network, Entity_AM };
-
-  Entity(EntityKind kind, Location location, std::string name,
-         std::vector<std::unique_ptr<Annotation>> annotations,
-         std::vector<std::unique_ptr<PortDecl>> inputPorts,
-         std::vector<std::unique_ptr<PortDecl>> outputPorts,
-         std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
-         std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters)
-      : kind(kind), location(location), name(name),
-        annotations(std::move(annotations)), inputPorts(std::move(inputPorts)),
-        outputPorts(std::move(outputPorts)),
-        typeParameters(std::move(typeParameters)),
-        valueParameters(std::move(valueParameters)) {}
-
-  virtual ~Entity() = default;
-
-  EntityKind getKind() const { return kind; }
-
-  llvm::StringRef getName() { return name; }
-
-  const Location &loc() { return location; }
-
-private:
-  const EntityKind kind;
-  Location location;
-  std::string name;
-  std::vector<std::unique_ptr<Annotation>> annotations;
-  std::vector<std::unique_ptr<PortDecl>> inputPorts;
-  std::vector<std::unique_ptr<PortDecl>> outputPorts;
-  std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
-  std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters;
-};
-
 class CalActor : public Entity {
 public:
   CalActor(Location location, std::string name,
@@ -2495,8 +2495,8 @@ public:
            std::vector<std::unique_ptr<PortDecl>> outputPorts,
            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
            std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters,
-           std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
            std::vector<std::unique_ptr<TypeDecl>> typeDecls,
+           std::vector<std::unique_ptr<LocalVarDecl>> varDecls,
            std::vector<std::unique_ptr<Expression>> invariants,
            std::vector<std::unique_ptr<Action>> actions,
            std::vector<std::unique_ptr<Action>> initializers,
@@ -2519,8 +2519,8 @@ public:
       : CalActor(location, name, std::vector<std::unique_ptr<Annotation>>(),
                  std::move(inputPorts), std::move(outputPorts),
                  std::move(typeParameters), std::move(valueParameters),
-                 std::vector<std::unique_ptr<LocalVarDecl>>(),
                  std::vector<std::unique_ptr<TypeDecl>>(),
+                 std::vector<std::unique_ptr<LocalVarDecl>>(),
                  std::vector<std::unique_ptr<Expression>>(),
                  std::vector<std::unique_ptr<Action>>(),
                  std::vector<std::unique_ptr<Action>>(),
@@ -2709,12 +2709,7 @@ private:
 /// Base class for all Entity Expression nodes.
 class EntityExpr {
 public:
-  enum EntityExprKind {
-    EntityExpr_Comprehension,
-    EntityExpr_If,
-    EntityExpr_Instance,
-    EntityExpr_Lists
-  };
+  enum EntityExprKind { EntityExpr_If, EntityExpr_Instance, EntityExpr_Lists };
 
   EntityExpr(EntityExprKind kind, Location location)
       : kind(kind), location(location) {}
@@ -2727,30 +2722,6 @@ public:
 private:
   const EntityExprKind kind;
   Location location;
-};
-
-class EntityComprehensionExpr : public EntityExpr {
-public:
-  EntityComprehensionExpr(Location location,
-                          std::unique_ptr<Generator> generator,
-                          std::vector<std::unique_ptr<Expression>> filters,
-                          std::unique_ptr<EntityExpr> collection)
-      : EntityExpr(EntityExpr_Comprehension, location),
-        generator(std::move(generator)), filters(std::move(filters)),
-        collection(std::move(collection)) {}
-
-  Generator *getGenerator() { return generator.get(); }
-  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
-  EntityExpr *getCollection() { return collection.get(); }
-  /// LLVM style RTTI
-  static bool classof(const EntityExpr *c) {
-    return c->getKind() == EntityExpr_Comprehension;
-  }
-
-private:
-  std::unique_ptr<Generator> generator;
-  std::vector<std::unique_ptr<Expression>> filters;
-  std::unique_ptr<EntityExpr> collection;
 };
 
 class EntityIfExpr : public EntityExpr {
@@ -2777,13 +2748,13 @@ private:
   std::unique_ptr<EntityExpr> falseEntity;
 };
 
-class EntityInstanceExpr : public EntityExpr, Attributable {
+class EntityInstanceExpr : public EntityExpr, public Attributable {
 public:
   EntityInstanceExpr(
-      Location location, std::vector<std::unique_ptr<ToolAttribute>> attributes,
-      std::unique_ptr<EntityReference> entity,
+      Location location, std::unique_ptr<EntityReference> entity,
       std::vector<std::unique_ptr<TypeParameter>> typeParameters,
-      std::vector<std::unique_ptr<ValueParameter>> valueParameters)
+      std::vector<std::unique_ptr<ValueParameter>> valueParameters,
+      std::vector<std::unique_ptr<ToolAttribute>> attributes)
       : EntityExpr(EntityExpr_Instance, location),
         Attributable(std::move(attributes)), entity(std::move(entity)),
         typeParameters(std::move(typeParameters)),
@@ -2810,12 +2781,17 @@ private:
 class EntityListExpr : public EntityExpr {
 public:
   EntityListExpr(Location location,
-                 std::vector<std::unique_ptr<EntityExpr>> entityList)
+                 std::vector<std::unique_ptr<EntityExpr>> collection,
+                 std::vector<std::unique_ptr<Generator>> generators)
       : EntityExpr(EntityExpr_Lists, location),
-        entityList(std::move(entityList)) {}
+        collection(std::move(collection)), generators(std::move(generators)) {}
 
-  llvm::ArrayRef<std::unique_ptr<EntityExpr>> getEntityList() {
-    return entityList;
+  llvm::ArrayRef<std::unique_ptr<EntityExpr>> getCollection() {
+    return collection;
+  }
+
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
   }
 
   /// LLVM style RTTI
@@ -2824,14 +2800,16 @@ public:
   }
 
 private:
-  std::vector<std::unique_ptr<EntityExpr>> entityList;
+  std::vector<std::unique_ptr<EntityExpr>> collection;
+  std::vector<std::unique_ptr<Generator>> generators;
 };
 
 /// Base class for Port Reference node.
 class PortReference {
 public:
-  PortReference(Location location, std::string portName, std::string entityName,
-                std::vector<std::unique_ptr<Expression>> entityIndex)
+  PortReference(Location location, std::string entityName,
+                std::vector<std::unique_ptr<Expression>> entityIndex,
+                std::string portName)
       : location(location), portName(portName), entityName(entityName),
         entityIndex(std::move(entityIndex)) {}
 
@@ -2872,11 +2850,14 @@ private:
   Location location;
 };
 
-class StructureConnectionStmt : public StructureStmt {
+class StructureConnectionStmt : public StructureStmt, public Attributable {
 public:
-  StructureConnectionStmt(Location location, std::unique_ptr<PortReference> src,
-                          std::unique_ptr<PortReference> dst)
-      : StructureStmt(StructureStmt_Connection, location), src(std::move(src)),
+  StructureConnectionStmt(
+      Location location, std::unique_ptr<PortReference> src,
+      std::unique_ptr<PortReference> dst,
+      std::vector<std::unique_ptr<ToolAttribute>> attributes)
+      : StructureStmt(StructureStmt_Connection, location),
+        Attributable(std::move(attributes)), src(std::move(src)),
         dst(std::move(dst)) {}
 
   PortReference *getSource() { return src.get(); }
@@ -2893,16 +2874,16 @@ private:
 
 class StructureForeachStmt : public StructureStmt {
 public:
-  StructureForeachStmt(Location location, std::unique_ptr<Generator> generator,
-                       std::vector<std::unique_ptr<Expression>> filters,
-                       std::vector<std::unique_ptr<Statement>> statements)
+  StructureForeachStmt(Location location,
+                       std::vector<std::unique_ptr<Generator>> generators,
+                       std::vector<std::unique_ptr<StructureStmt>> statements)
       : StructureStmt(StructureStmt_Foreach, location),
-        generator(std::move(generator)), filters(std::move(filters)),
-        statements(std::move(statements)) {}
+        generators(std::move(generators)), statements(std::move(statements)) {}
 
-  Generator *getGenerator() { return generator.get(); }
-  llvm::ArrayRef<std::unique_ptr<Expression>> getFilters() { return filters; }
-  llvm::ArrayRef<std::unique_ptr<Statement>> getStatements() {
+  llvm::ArrayRef<std::unique_ptr<Generator>> getGenerators() {
+    return generators;
+  }
+  llvm::ArrayRef<std::unique_ptr<StructureStmt>> getStatements() {
     return statements;
   }
 
@@ -2912,9 +2893,8 @@ public:
   }
 
 private:
-  std::unique_ptr<Generator> generator;
-  std::vector<std::unique_ptr<Expression>> filters;
-  std::vector<std::unique_ptr<Statement>> statements;
+  std::vector<std::unique_ptr<Generator>> generators;
+  std::vector<std::unique_ptr<StructureStmt>> statements;
 };
 
 class StructureIfStmt : public StructureStmt {
@@ -2922,6 +2902,7 @@ public:
   StructureIfStmt(Location location, std::unique_ptr<Expression> condition,
                   std::vector<std::unique_ptr<StructureStmt>> trueStmt,
                   std::vector<std::unique_ptr<StructureStmt>> falseStmt)
+
       : StructureStmt(StructureStmt_If, location),
         condition(std::move(condition)), trueStmt(std::move(trueStmt)),
         falseStmt(std::move(falseStmt)) {}
@@ -2983,6 +2964,19 @@ public:
         typeDecls(std::move(typeDecls)), varDecls(std::move(varDecls)),
         entities(std::move(entities)), structure(std::move(structure)) {}
 
+  NLNetwork(Location location, std::string name,
+            std::vector<std::unique_ptr<PortDecl>> inputPorts,
+            std::vector<std::unique_ptr<PortDecl>> outputPorts,
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters)
+      : NLNetwork(location, name, std::vector<std::unique_ptr<Annotation>>(),
+                  std::move(inputPorts), std::move(outputPorts),
+                  std::move(typeParameters), std::move(valueParameters),
+                  std::vector<std::unique_ptr<TypeDecl>>(),
+                  std::vector<std::unique_ptr<LocalVarDecl>>(),
+                  std::vector<std::unique_ptr<InstanceDecl>>(),
+                  std::vector<std::unique_ptr<StructureStmt>>()) {}
+
   llvm::ArrayRef<std::unique_ptr<TypeDecl>> getTypeDecls() { return typeDecls; }
 
   llvm::ArrayRef<std::unique_ptr<LocalVarDecl>> getVarDecls() {
@@ -2995,6 +2989,19 @@ public:
 
   llvm::ArrayRef<std::unique_ptr<StructureStmt>> getStructure() {
     return structure;
+  }
+
+
+  void addVarDecls(std::vector<std::unique_ptr<LocalVarDecl>> varDecls_) {
+    varDecls = std::move(varDecls_);
+  }
+
+  void addEntities(std::vector<std::unique_ptr<InstanceDecl>> entities_){
+    entities = std::move(entities_);
+  }
+
+  void addStructure(std::vector<std::unique_ptr<StructureStmt>> structure_){
+    structure = std::move(structure_);
   }
 
   /// LLVM style RTTI
