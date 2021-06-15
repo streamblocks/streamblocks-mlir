@@ -594,13 +594,13 @@ let_expr:
 
 
 list_expr:
-        "[" exprs "]"  { $$ = make_unique<ExprList>(@$, std::move($2), std::vector<std::unique_ptr<Generator>>()); }
-    |   "[" exprs ":" for_generators "]"  { $$ = make_unique<ExprList>(@$, std::move($2), std::move($4)); }
+        "[" exprs "]"  { $$ = std::make_unique<ExprList>(@$, std::move($2), std::vector<std::unique_ptr<Generator>>()); }
+    |   "[" exprs ":" for_generators "]"  { $$ = std::make_unique<ExprList>(@$, std::move($2), std::move($4)); }
     ;
 
 set_expr:
-        "{" exprs "}"  { $$ = make_unique<ExprSet>(@$, std::move($2), std::vector<std::unique_ptr<Generator>>()); }
-    |   "{" exprs ":" for_generators "}"  { $$ = make_unique<ExprSet>(@$, std::move($2), std::move($4)); }
+        "{" exprs "}"  { $$ = std::make_unique<ExprSet>(@$, std::move($2), std::vector<std::unique_ptr<Generator>>()); }
+    |   "{" exprs ":" for_generators "}"  { $$ = std::make_unique<ExprSet>(@$, std::move($2), std::move($4)); }
     ;
 
 map_expr:
@@ -840,6 +840,8 @@ alias_type:
             $$ = std::make_unique<AliasTypeDecl>(@$, $3, $1, std::move($5));
         }
     ;
+
+
 
 /* Variable Declaration */
 
@@ -1353,7 +1355,7 @@ entity_expr:
 
             auto entityRef = std::make_unique<EntityRefLocal>(@1, $1);
 
-            $$ = make_unique<EntityInstanceExpr>(@$, std::move(entityRef), std::move(types), std::move(values), std::move($5));
+            $$ = std::make_unique<EntityInstanceExpr>(@$, std::move(entityRef), std::move(types), std::move(values), std::move($5));
 
         }
     |   "if" expr "then" entity_expr "else" entity_expr "end"

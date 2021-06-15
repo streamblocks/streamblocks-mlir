@@ -238,7 +238,7 @@ public:
 
   void setExternal(bool value) { external = value; }
 
-  static bool classof(const Parameter *c) {
+  static bool classof(const Decl *c) {
     return c->getKind() >= Decl_Var && c->getKind() <= Decl_Pattern_Var;
   }
 
@@ -326,8 +326,8 @@ public:
     return std::make_unique<TypeDecl>(loc(), llvm::Twine(getName()).str());
   }
 
-  static bool classof(const Parameter *c) {
-    return c->getKind() >= Decl_Type && c->getKind() <= Decl_Parameter_Type;
+  static bool classof(const Decl *c) {
+    return (c->getKind() >= Decl_Type) && (c->getKind() <= Decl_Parameter_Type);
   }
 };
 
@@ -717,7 +717,7 @@ public:
   getValueParameters() = 0;
 };
 
-class SumTypeDecl : public GlobalTypeDecl, AlgebraicTypeDecl {
+class SumTypeDecl : public GlobalTypeDecl, public AlgebraicTypeDecl {
 public:
   SumTypeDecl(Location location, std::string name, Availability availability,
               std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters,
@@ -751,7 +751,7 @@ private:
   std::vector<std::unique_ptr<VariantDecl>> variants;
 };
 
-class ProductTypeDecl : public GlobalTypeDecl, AlgebraicTypeDecl {
+class ProductTypeDecl : public GlobalTypeDecl, public AlgebraicTypeDecl {
 public:
   ProductTypeDecl(
       Location location, std::string name, Availability availability,

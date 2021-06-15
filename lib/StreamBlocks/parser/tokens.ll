@@ -238,6 +238,7 @@ SPTAB         [ \t]
 "structure" { return cal::CalParser::make_STRUCTURE(loc); }
 "then" { return cal::CalParser::make_THEN(loc); }
 "time" { return cal::CalParser::make_TIME(loc); }
+"type" { return cal::CalParser::make_TYPE(loc); }
 "to" { return cal::CalParser::make_TO(loc); }
 "true" { return cal::CalParser::make_TRUE(loc); }
 "var" { return cal::CalParser::make_VAR(loc); }
