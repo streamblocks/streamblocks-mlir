@@ -225,6 +225,8 @@
 
 %type <std::unique_ptr<ParameterVarDecl>> formal_value_parameter
 
+%type <std::unique_ptr<ParameterTypeDecl>> formal_type_parameter
+
 %type <std::unique_ptr<GeneratorVarDecl>> generator_var_decl
 
 %type <std::unique_ptr<Statement>> stmt assignment_stmt call_stmt block_stmt if_stmt elsif_stmt while_stmt foreach_stmt read_stmt write_stmt
@@ -289,6 +291,15 @@
 
 %type <std::vector<std::unique_ptr<StructureStmt>>> structure_stmts structure_stmts.opt section_structure
 
+%type <std::unique_ptr<GlobalTypeDecl>> algebraic_type
+
+%type <std::unique_ptr<FieldDecl>> field_decl
+
+%type <std::unique_ptr<VariantDecl>> variant_decl
+
+%type <std::vector<std::unique_ptr<FieldDecl>>> field_decls field_decls.opt
+
+%type <std::vector<std::unique_ptr<VariantDecl>>> variant_decls
 
 
 %left ".."
@@ -828,6 +839,7 @@ type_parameter:
 
 global_type_decl:
         alias_type
+    |   algebraic_type
     ;
 
 alias_type:
@@ -840,6 +852,84 @@ alias_type:
             $$ = std::make_unique<AliasTypeDecl>(@$, $3, $1, std::move($5));
         }
     ;
+
+
+field_decl:
+    type ID
+    {
+        $$ = std::make_unique<FieldDecl>(@$, std::move($1), $2);
+    }
+    ;
+
+field_decls:
+        field_decl
+        {
+            $$.push_back($1);
+        }
+    |   field_decls "," field_decl
+        {
+            $$=$1; $$.push_back($3);
+        }
+    ;
+
+field_decls.opt:
+        %empty
+        {
+        }
+    |  "(" field_decls ")"
+        {
+            $$=$2;
+        }
+    ;
+
+variant_decl:
+    ID field_decls.opt
+    {
+        $$ = std::make_unique<VariantDecl>(@$, $1, std::move($2));
+    }
+    ;
+
+
+variant_decls:
+        variant_decl { $$.push_back($1); }
+    |   variant_decls "|" variant_decl { $$=$1; $$.push_back($3); }
+    ;
+
+algebraic_type:
+        "type" ID "(" formal_parameters ")" ":" "(" field_decls ")" "end"
+        {
+            auto params = $4;
+            auto typeParam =  std::move(std::get<0>(params));
+            auto valueParam = std::move(std::get<1>(params));
+
+            $$ = std::make_unique<ProductTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($8));
+        }
+    |   availability "type" ID "(" formal_parameters ")" ":" "(" field_decls ")" "end"
+        {
+            auto params = $5;
+            auto typeParam =  std::move(std::get<0>(params));
+            auto valueParam = std::move(std::get<1>(params));
+
+            $$ = std::make_unique<ProductTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($9));
+        }
+    |   "type" ID "(" formal_parameters ")" ":" variant_decls "end"
+        {
+            auto params = $4;
+            auto typeParam =  std::move(std::get<0>(params));
+            auto valueParam = std::move(std::get<1>(params));
+
+            $$ = std::make_unique<SumTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($7));
+        }
+    |   availability "type" ID "(" formal_parameters ")" ":" variant_decls "end"
+        {
+            auto params = $5;
+            auto typeParam =  std::move(std::get<0>(params));
+            auto valueParam = std::move(std::get<1>(params));
+
+            $$ = std::make_unique<SumTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($8));
+        }
+    ;
+
 
 
 
@@ -872,6 +962,49 @@ formal_value_parameter:
         auto t = std::unique_ptr<ParameterVarDecl>(static_cast<ParameterVarDecl*>($1.release()));
         $$ = std::move(t);
     }
+    ;
+
+formal_type_parameter:
+    "type" ID
+    {
+        $$ = std::make_unique<ParameterTypeDecl>(@$, $2);
+    }
+    ;
+
+%nterm <std::pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>> formal_parameters;
+formal_parameters:
+        formal_value_parameter
+        {
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParam;
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParam;
+
+            valueParam.push_back(std::move($1));
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+        }
+    |   formal_type_parameter
+        {
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParam;
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParam;
+
+            typeParam.push_back(std::move($1));
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+        }
+    |   formal_parameters "," formal_value_parameter
+        {
+            auto pair = $1;
+            auto typeParam =  std::move(std::get<0>(pair));
+            auto valueParam = std::move(std::get<1>(pair));
+            valueParam.push_back(std::move($3));
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+        }
+    |   formal_parameters "," formal_type_parameter
+        {
+            auto pair = $1;
+            auto typeParam =  std::move(std::get<0>(pair));
+            auto valueParam = std::move(std::get<1>(pair));
+            typeParam.push_back(std::move($3));
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+        }
     ;
 
 availability:

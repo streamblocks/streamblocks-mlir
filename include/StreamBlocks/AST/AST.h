@@ -611,13 +611,11 @@ private:
 
 class FieldDecl : public VarDecl {
 public:
-  FieldDecl(Location location, std::string name, std::unique_ptr<TypeExpr> type,
-            std::unique_ptr<Expression> value)
-      : VarDecl(location, name, std::move(type), std::move(value), false,
-                false) {}
+  FieldDecl(Location location, std::unique_ptr<TypeExpr> type, std::string name)
+      : VarDecl(location, name, std::move(type), nullptr, false, false) {}
   std::unique_ptr<Decl> clone() const override {
-    return std::make_unique<FieldDecl>(loc(), llvm::Twine(getName()).str(),
-                                       type->clone(), value->clone());
+    return std::make_unique<FieldDecl>(loc(), type->clone(),
+                                       llvm::Twine(getName()).str());
   }
 };
 
@@ -2991,16 +2989,15 @@ public:
     return structure;
   }
 
-
   void addVarDecls(std::vector<std::unique_ptr<LocalVarDecl>> varDecls_) {
     varDecls = std::move(varDecls_);
   }
 
-  void addEntities(std::vector<std::unique_ptr<InstanceDecl>> entities_){
+  void addEntities(std::vector<std::unique_ptr<InstanceDecl>> entities_) {
     entities = std::move(entities_);
   }
 
-  void addStructure(std::vector<std::unique_ptr<StructureStmt>> structure_){
+  void addStructure(std::vector<std::unique_ptr<StructureStmt>> structure_) {
     structure = std::move(structure_);
   }
 

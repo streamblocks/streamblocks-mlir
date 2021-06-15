@@ -1,5 +1,7 @@
 namespace test:
 
+    type T(type A, int b) : A(A X, int(size=b) Y) | B end
+
     actor Source() ==> int O:
 
         int Counter := 0;
