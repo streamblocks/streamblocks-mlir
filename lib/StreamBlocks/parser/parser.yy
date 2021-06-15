@@ -13,6 +13,7 @@
      #include <memory>
      #include <string>
      #include <vector>
+     #include <queue>
 
      #include "StreamBlocks/AST/AST.h"
 
@@ -133,7 +134,7 @@
 
 /* -- Delimiters --*/
 %token COLON ":"
-%token COLON_COLON "::"
+%token <std::string> COLON_COLON "::"
 %token COLON_EQUALS ":="
 %token COMMA ","
 %token DASH_DASH_GT "-->"
@@ -201,7 +202,7 @@
 
 %type <std::unique_ptr<Import>> import single_import group_import
 
-%type <std::unique_ptr<Expression>> expr postfix_expr primary_expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr map_expr lambda_expr proc_expr application_expr repeat.opt delay.opt generator_in.opt
+%type <std::unique_ptr<Expression>> expr postfix_expr primary_expr var_expr literal_expr binary_expr unary_expr tuple_expr if_expr elsif_expr function_body let_expr list_expr set_expr map_expr lambda_expr proc_expr repeat.opt delay.opt generator_in.opt
 
 %type <std::string> unary_op
 
@@ -301,6 +302,7 @@
 
 %type <std::vector<std::unique_ptr<VariantDecl>>> variant_decls
 
+%type <std::pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>> formal_parameters formal_parameters.opt formal_parameters_paren.opt
 
 %left ".."
 %left "||" "or"
@@ -314,6 +316,7 @@
 %left "-" "+"
 %left "div" "%" "mod" "*" "/"
 %left "**"
+%left "::"
 
 %nonassoc "if"
 %nonassoc "else"
@@ -438,14 +441,42 @@ expr:
 
 postfix_expr:
         primary_expr
+    |   postfix_expr "(" exprs ")"
+        {
+            $$ = std::make_unique<ExprApplication>(@$, std::move($1), std::move($3));
+        }
     |   postfix_expr "[" exprs.opt "]"
-    |   postfix_expr "{" exprs.opt "}"
+        {
+            auto postfix = $1;
+            auto indexes = $3;
+            if(indexes.size() == 1){
+                $$ = std::make_unique<ExprIndexer>(@$, std::move(postfix), std::move(indexes[0]));
+            } else {
+                std::queue<std::unique_ptr<Expression>> q;
+                for (auto& e: indexes)
+                  q.push(std::move(e));
+
+                auto indexer = std::make_unique<ExprIndexer>(@$, std::move(postfix), std::move(q.front()));
+                q.pop();
+
+                while(!q.empty()) {
+                    indexer = std::make_unique<ExprIndexer>(@$, std::move(std::move(indexer)), std::move(q.front()));
+                    q.pop();
+                }
+
+                $$ = std::move(indexer);
+            }
+        }
+/*  |   postfix_expr "{" exprs.opt "}" */
     |   postfix_expr "." ID
+        {
+            auto field = std::make_unique<Field>(@3, $3);
+            $$ = std::make_unique<ExprField>(@$, std::move($1), std::move(field));
+        }
     ;
 
 primary_expr:
         var_expr
-    |   application_expr
     |   literal_expr
     |   if_expr
     |   lambda_expr
@@ -456,7 +487,7 @@ primary_expr:
     |   set_expr
     |   map_expr
     |   "(" expr ")" { $$ = $2; }
-    |   "(" expr "::" type ")"
+    |   "(" expr "as" type ")"
         {
             $$ = std::make_unique<cal::ExprTypeAssertion>(@$, std::move($2), std::move($4));
         }
@@ -464,10 +495,6 @@ primary_expr:
 
 var_expr:
     ID { $$ = std::make_unique<cal::ExprVariable>(@$, $1); }
-    ;
-
-application_expr:
-    ID "(" exprs ")" { $$ = std::make_unique<ExprApplication>(@$, $1, std::move($3));}
     ;
 
 literal_expr:
@@ -506,6 +533,20 @@ binary_expr:
     |   expr "%"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
     |   expr "*"   expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
     |   expr "**"  expr { $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move($1), std::move($3)); }
+    |   expr "::"  expr
+        {
+            auto constructor = $1;
+            auto variant_constructor = $3;
+            if( constructor->getKind() != Expression::ExpressionKind::Expr_Variable ){
+                error(@1, "Wrong sum type construction: it should start with a type ID!");
+            }
+
+            if(variant_constructor->getKind() != Expression::ExpressionKind::Expr_Application & variant_constructor->getKind() != Expression::ExpressionKind::Expr_Variable){
+                error(@1, "Wrong sum type variant construction!");
+            }
+
+            $$ = std::make_unique<cal::ExprBinary>(@$, $2, std::move(constructor), std::move(variant_constructor));
+        }
     ;
 
 unary_op:
@@ -896,37 +937,37 @@ variant_decls:
     ;
 
 algebraic_type:
-        "type" ID "(" formal_parameters ")" ":" "(" field_decls ")" "end"
+        "type" ID formal_parameters_paren.opt ":" "(" field_decls ")" "end"
+        {
+            auto params = $3;
+            auto typeParam =  std::move(std::get<0>(params));
+            auto valueParam = std::move(std::get<1>(params));
+
+            $$ = std::make_unique<ProductTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($6));
+        }
+    |   availability "type" ID formal_parameters_paren.opt ":" "(" field_decls ")" "end"
         {
             auto params = $4;
             auto typeParam =  std::move(std::get<0>(params));
             auto valueParam = std::move(std::get<1>(params));
 
-            $$ = std::make_unique<ProductTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($8));
+            $$ = std::make_unique<ProductTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($7));
         }
-    |   availability "type" ID "(" formal_parameters ")" ":" "(" field_decls ")" "end"
+    |   "type" ID formal_parameters_paren.opt ":" variant_decls "end"
         {
-            auto params = $5;
+            auto params = $3;
             auto typeParam =  std::move(std::get<0>(params));
             auto valueParam = std::move(std::get<1>(params));
 
-            $$ = std::make_unique<ProductTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($9));
+            $$ = std::make_unique<SumTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($5));
         }
-    |   "type" ID "(" formal_parameters ")" ":" variant_decls "end"
+    |   availability "type" ID formal_parameters_paren.opt ":" variant_decls "end"
         {
             auto params = $4;
             auto typeParam =  std::move(std::get<0>(params));
             auto valueParam = std::move(std::get<1>(params));
 
-            $$ = std::make_unique<SumTypeDecl>(@$, $2, Availability::PUBLIC, std::move(typeParam), std::move(valueParam), std::move($7));
-        }
-    |   availability "type" ID "(" formal_parameters ")" ":" variant_decls "end"
-        {
-            auto params = $5;
-            auto typeParam =  std::move(std::get<0>(params));
-            auto valueParam = std::move(std::get<1>(params));
-
-            $$ = std::make_unique<SumTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($8));
+            $$ = std::make_unique<SumTypeDecl>(@$, $3, $1, std::move(typeParam), std::move(valueParam), std::move($6));
         }
     ;
 
@@ -971,7 +1012,6 @@ formal_type_parameter:
     }
     ;
 
-%nterm <std::pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>> formal_parameters;
 formal_parameters:
         formal_value_parameter
         {
@@ -1004,6 +1044,36 @@ formal_parameters:
             auto valueParam = std::move(std::get<1>(pair));
             typeParam.push_back(std::move($3));
             $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+        }
+    ;
+
+formal_parameters.opt:
+        %empty
+        {
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParam;
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParam;
+
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+
+        }
+    |   formal_parameters
+        {
+            $$ = $1;
+        }
+    ;
+
+formal_parameters_paren.opt:
+        %empty
+        {
+            std::vector<std::unique_ptr<ParameterTypeDecl>> typeParam;
+            std::vector<std::unique_ptr<ParameterVarDecl>> valueParam;
+
+            $$ = std::make_pair<std::vector<std::unique_ptr<ParameterTypeDecl>>, std::vector<std::unique_ptr<ParameterVarDecl>>>(std::move(typeParam), std::move(valueParam));
+
+        }
+    |  "(" formal_parameters ")"
+        {
+            $$ = $2;
         }
     ;
 
@@ -1377,14 +1447,15 @@ network_body:
     ;
 
 network_head:
-    "network" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
+    "network" ID "(" formal_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
     {
-        std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
-        std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters = $4;
+        auto pair = $4;
+       auto typeParam =  std::move(std::get<0>(pair));
+       auto valueParam = std::move(std::get<1>(pair));
 
         $$ = std::make_unique<NLNetwork>(@$, $2, std::move($6), std::move($8),
-                std::move(typeParameters),
-                std::move(valueParameters));
+                std::move(typeParam),
+                std::move(valueParam));
     }
     ;
 
@@ -1721,14 +1792,15 @@ actor_body:
 
 
 actor_head:
-    "actor" ID "(" formal_value_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
+    "actor" ID "(" formal_parameters.opt ")" port_inputs.opt "==>" port_outputs.opt time.opt ":"
     {
-        std::vector<std::unique_ptr<ParameterTypeDecl>> typeParameters;
-        std::vector<std::unique_ptr<ParameterVarDecl>> valueParameters = $4;
+        auto pair = $4;
+        auto typeParam =  std::move(std::get<0>(pair));
+        auto valueParam = std::move(std::get<1>(pair));
 
         $$ = std::make_unique<CalActor>(@$, $2, std::move($6), std::move($8),
-                std::move(typeParameters),
-                std::move(valueParameters));
+                std::move(typeParam),
+                std::move(valueParam));
     }
     ;
 

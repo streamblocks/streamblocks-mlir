@@ -48,6 +48,7 @@ public:
     Expr_Application,
     Expr_If,
     Expr_Indexer,
+    Expr_Field,
     Expr_Lambda,
     Expr_Let,
     Expr_List,
@@ -401,6 +402,10 @@ public:
 
   const Location &loc() { return location; }
   llvm::StringRef getName() { return name; }
+
+  std::unique_ptr<Field> clone() {
+    return std::make_unique<Field>(loc(), llvm::Twine(getName()).str());
+  }
 
 private:
   Location location;
@@ -1204,12 +1209,12 @@ private:
 class ExprApplication : public Expression {
 
 public:
-  ExprApplication(Location loc, std::string callee,
+  ExprApplication(Location loc, std::unique_ptr<Expression> callee,
                   std::vector<std::unique_ptr<Expression>> args)
-      : Expression(Expr_Application, loc), callee(callee),
+      : Expression(Expr_Application, loc), callee(std::move(callee)),
         args(std::move(args)) {}
 
-  llvm::StringRef getCallee() { return callee; }
+  Expression *getCallee() { return callee.get(); }
   llvm::ArrayRef<std::unique_ptr<Expression>> getArgs() { return args; }
 
   std::unique_ptr<Expression> clone() const override {
@@ -1218,7 +1223,7 @@ public:
     for (const auto &e : args) {
       to.push_back(e->clone());
     }
-    return std::make_unique<ExprApplication>(loc(), callee, std::move(to));
+    return std::make_unique<ExprApplication>(loc(), callee->clone(), std::move(to));
   }
 
   /// LLVM style RTTI
@@ -1227,7 +1232,7 @@ public:
   }
 
 private:
-  std::string callee;
+  std::unique_ptr<Expression> callee;
   std::vector<std::unique_ptr<Expression>> args;
 };
 
@@ -1279,6 +1284,31 @@ private:
   std::unique_ptr<Expression> condition;
   std::unique_ptr<Expression> thenExpr;
   std::unique_ptr<Expression> elseExpr;
+};
+
+class ExprField : public Expression {
+public:
+  ExprField(Location location, std::unique_ptr<Expression> structure,
+            std::unique_ptr<Field> field)
+      : Expression(Expr_Field, location), structure(std::move(structure)),
+        field(std::move(field)) {}
+
+  std::unique_ptr<Expression> clone() const override {
+    return std::make_unique<ExprField>(loc(), structure->clone(),
+                                       field->clone());
+  }
+
+  Expression *getStructure() { return structure.get(); }
+  Field *getField() { return field.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Expression *c) {
+    return c->getKind() == Expr_Field;
+  }
+
+private:
+  std::unique_ptr<Expression> structure;
+  std::unique_ptr<Field> field;
 };
 
 class ExprLambda : public Expression {
