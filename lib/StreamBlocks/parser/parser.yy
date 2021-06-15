@@ -40,7 +40,7 @@
 %locations
 
 %define parse.trace
-%define parse.error verbose
+%define parse.error detailed
 
 %code {
 # include "driver.h"

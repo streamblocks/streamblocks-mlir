@@ -165,7 +165,7 @@ SPTAB         [ \t]
 
 {NL}+        loc.lines (yyleng); loc.step ();
 
-
+\t\r+     loc.step();
 
 "action" { return cal::CalParser::make_ACTION(loc); }
 "actor" { return cal::CalParser::make_ACTOR(loc); }
@@ -378,10 +378,6 @@ SPTAB         [ \t]
     cal::CalParser::syntax_error (loc, "unterminated /""*...*""/ comment");
 }
 
-[ \t\n\f\v\r]+  {
-  /* whitespace do nothing */
-  loc.step();
-}
 
 .          {
              cal::CalParser::syntax_error

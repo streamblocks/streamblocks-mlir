@@ -1,10 +1,10 @@
 namespace test:
-
+/* -- bla
     type T: A(A X, int(size=b) Y) | B end
 
-    actor Source() ==> int O:
+    actor Source() ==> int O :
 
-        int Counter := A::A;
+        int Counter := 10e5;
 
         action ==> O:[token]
         guard
