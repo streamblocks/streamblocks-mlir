@@ -10,7 +10,7 @@
 
 // Give Flex the prototype of yylex we want ...
 # define YY_DECL \
-  cal::CalParser::symbol_type yylex (driver& drv)
+  cal::CalParser::symbol_type yylex (driver& drv, std::string filename)
 // ... and declare it for the parser's sake.
 YY_DECL;
 
@@ -20,20 +20,19 @@ class driver
 public:
   driver () : trace_parsing (false), trace_scanning (false)
   {
-    variables["one"] = 1;
-    variables["two"] = 2;
+
   }
 
-  std::map<std::string, int> variables;
 
-  int result;
+  std::unique_ptr<cal::NamespaceDecl> result;
 
   // Run the parser on file F.  Return 0 on success.
   int parse (const std::string& f){
     file = f;
     location.initialize (&file);
     scan_begin ();
-    cal::CalParser parse (*this);
+   // cal::location::filename_type
+    cal::CalParser parse (*this, file);
     parse.set_debug_level (trace_parsing);
     int res = parse ();
     scan_end ();

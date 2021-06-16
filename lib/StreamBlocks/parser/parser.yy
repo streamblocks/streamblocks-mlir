@@ -35,10 +35,16 @@
 }
 
 // The parsing context.
-%param { driver& drv }
+%param { driver& drv } {std::string file_name}
+
+%initial-action
+{
+  @$.initialize (&file_name);
+};
 
 %locations
 
+%define parse.lac full
 %define parse.trace
 %define parse.error detailed
 
@@ -328,7 +334,13 @@
 
 unit:
         namespace_decl_default
+        {
+            drv.result = std::move($1);
+        }
     |   namespace_decl
+        {
+            drv.result = std::move($1);
+        }
     ;
 
 /* QID */
