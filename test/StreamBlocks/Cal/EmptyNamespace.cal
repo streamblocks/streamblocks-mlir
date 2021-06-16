@@ -1,5 +1,7 @@
 namespace test:
 
+import var test.jj=a;
+
     type T: A(A X, int(size=b) Y) | B end
 
     actor Source() ==> int O :

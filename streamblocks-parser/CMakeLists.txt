@@ -7,6 +7,14 @@ FLEX_TARGET(Scanner ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/tokens.ll ${CMAK
 ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
 
 
+set(LLVM_LINK_COMPONENTS
+        Core
+        Support
+        nativecodegen
+        OrcJIT
+        )
+
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
@@ -17,13 +25,30 @@ set(LIBS
         )
 
 set(SOURCES
+        parser/AST.cpp
         streamblocks-parser.cpp
         )
 
 add_llvm_executable(streamblocks-parser ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
 
 llvm_update_compile_flags(streamblocks-parser)
-target_link_libraries(streamblocks-parser PRIVATE ${LIBS})
+target_link_libraries(streamblocks-parser
+    PRIVATE
+        ${LIBS}
+        ${dialect_libs}
+        ${conversion_libs}
+        MLIRAnalysis
+        MLIRCallInterfaces
+        MLIRCastInterfaces
+        MLIRExecutionEngine
+        MLIRIR
+        MLIRLLVMToLLVMIRTranslation
+        MLIRParser
+        MLIRPass
+        MLIRSideEffectInterfaces
+        MLIRTargetLLVMIRExport
+        MLIRTransforms
+        )
 target_include_directories(streamblocks-parser PRIVATE ${CMAKE_CURRENT_BINARY_DIR} .)
 
 mlir_check_all_link_libraries(streamblocks-parser)

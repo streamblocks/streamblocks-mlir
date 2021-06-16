@@ -353,8 +353,8 @@ qid :
         simple_qid
     |   qid "." simple_qid
         {
-            $$ = $1;
-            $$.get()->concat(std::move($3));
+            auto qid = $1;
+            $$ = qid.get()->concat(std::move($3));
         }
     ;
 

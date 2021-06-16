@@ -553,7 +553,7 @@ public:
   virtual Availability getAvailability() const = 0;
 };
 
-class GlobalTypeDecl : public TypeDecl, GlobalDecl {
+class GlobalTypeDecl : public TypeDecl, public GlobalDecl {
 public:
   GlobalTypeDecl(Location location, std::string name,
                  const Availability availability)
@@ -814,6 +814,13 @@ public:
       : Import(Import_Single, location, prefix),
         globalName(std::move(globalName)), localName(localName) {}
 
+  QID *getGlobalName() { return globalName.get(); }
+
+  llvm::StringRef getLocalName() { return localName; }
+
+  /// LLVM style RTTI
+  static bool classof(const Import *c) { return c->getKind() == Import_Single; }
+
 private:
   std::unique_ptr<QID> globalName;
   std::string localName;
@@ -824,6 +831,11 @@ public:
   GroupImport(Location location, Prefix prefix, std::unique_ptr<QID> globalName)
       : Import(Import_Group, location, prefix),
         globalName(std::move(globalName)) {}
+
+  QID *getGlobalName() { return globalName.get(); }
+
+  /// LLVM style RTTI
+  static bool classof(const Import *c) { return c->getKind() == Import_Group; }
 
 private:
   std::unique_ptr<QID> globalName;
@@ -1223,7 +1235,8 @@ public:
     for (const auto &e : args) {
       to.push_back(e->clone());
     }
-    return std::make_unique<ExprApplication>(loc(), callee->clone(), std::move(to));
+    return std::make_unique<ExprApplication>(loc(), callee->clone(),
+                                             std::move(to));
   }
 
   /// LLVM style RTTI
@@ -3105,6 +3118,8 @@ private:
   std::vector<std::unique_ptr<GlobalEntityDecl>> entityDecls;
   std::vector<std::unique_ptr<GlobalTypeDecl>> typeDecl;
 };
+
+void dump(NamespaceDecl &);
 
 } // namespace cal
 

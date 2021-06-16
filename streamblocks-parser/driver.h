@@ -1,7 +1,3 @@
-//
-// Created by endrix on 27.05.21.
-//
-
 #ifndef DRIVER_H
 #define DRIVER_H
 # include <string>
