@@ -17,9 +17,7 @@
 
      #include "StreamBlocks/AST/AST.h"
 
-     namespace cal {
-        class QID;
-     }
+
 
   // The following definitions is missing when %locations isn't used
   # ifndef YY_NULLPTR

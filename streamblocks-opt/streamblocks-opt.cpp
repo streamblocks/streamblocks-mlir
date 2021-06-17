@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // TODO: Register streamblocks passes here.
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::dwf::DWFDialect>();
+  registry.insert<streamblocks::dwf::DWFDialect>();
   registry.insert<mlir::StandardOpsDialect>();
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that

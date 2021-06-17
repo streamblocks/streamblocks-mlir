@@ -2,8 +2,8 @@
 FIND_PACKAGE(FLEX)
 FIND_PACKAGE(BISON)
 
-BISON_TARGET(Parser ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/parser.yy  ${CMAKE_CURRENT_BINARY_DIR}/cal_parser.cpp)
-FLEX_TARGET(Scanner ${CMAKE_SOURCE_DIR}/lib/StreamBlocks/parser/tokens.ll ${CMAKE_CURRENT_BINARY_DIR}/cal_lexer.yy.cpp)
+BISON_TARGET(Parser parser/parser.yy  ${CMAKE_CURRENT_BINARY_DIR}/cal_parser.cpp)
+FLEX_TARGET(Scanner parser/tokens.ll ${CMAKE_CURRENT_BINARY_DIR}/cal_lexer.yy.cpp)
 ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
 
 
@@ -27,13 +27,13 @@ set(LIBS
 
 set(SOURCES
         parser/AST.cpp
-        streamblocks-parser.cpp
+        streamblocks-compiler.cpp
         )
 
-add_llvm_executable(streamblocks-parser ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
+add_llvm_executable(sbc ${SOURCES} ${BISON_Parser_OUTPUTS} ${FLEX_Scanner_OUTPUTS})
 
-llvm_update_compile_flags(streamblocks-parser)
-target_link_libraries(streamblocks-parser
+llvm_update_compile_flags(sbc)
+target_link_libraries(sbc
     PRIVATE
         ${LIBS}
         ${dialect_libs}
@@ -50,6 +50,6 @@ target_link_libraries(streamblocks-parser
         MLIRTargetLLVMIRExport
         MLIRTransforms
         )
-target_include_directories(streamblocks-parser PRIVATE ${CMAKE_CURRENT_BINARY_DIR} .)
+target_include_directories(sbc PRIVATE ${CMAKE_CURRENT_BINARY_DIR} .)
 
-mlir_check_all_link_libraries(streamblocks-parser)
+mlir_check_all_link_libraries(sbc)
