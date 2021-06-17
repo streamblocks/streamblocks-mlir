@@ -1,4 +1,4 @@
-//===- DWFDialect.cpp - DWF dialect ---------------*- C++ -*-===//
+//===- CommonDialect.cpp - Common dialect ---------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,19 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "StreamBlocks/DWF/DWFDialect.h"
-#include "StreamBlocks/DWF/DWFOps.h"
+#include "StreamBlocks/Common/CommonDialect.h"
+#include "StreamBlocks/Common/CommonOps.h"
 
 using namespace mlir;
-using namespace streamblocks::dwf;
+using namespace streamblocks::common;
 
 //===----------------------------------------------------------------------===//
 // DWF dialect.
 //===----------------------------------------------------------------------===//
 
-void DWFDialect::initialize() {
+void CommonDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "StreamBlocks/DWF/DWFOps.cpp.inc"
-      >();
+#include "StreamBlocks/Common/CommonOps.cpp.inc"
+  >();
 }

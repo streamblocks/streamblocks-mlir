@@ -21,7 +21,8 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIROptLib
-        MLIRStreamBlocks
+        MLIRCommon
+        MLIRDWF
         )
 
 set(SOURCES
