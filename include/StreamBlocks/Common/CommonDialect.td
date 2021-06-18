@@ -11,6 +11,7 @@
 
 include "mlir/IR/OpBase.td"
 
+
 //===----------------------------------------------------------------------===//
 // Common dialect definition.
 //===----------------------------------------------------------------------===//
@@ -34,8 +35,15 @@ def Common_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 class Common_Op<string mnemonic, list<OpTrait> traits = []> :
-        Op<Common_Dialect, mnemonic, traits>;
+        Op<Common_Dialect, mnemonic, traits>{
+
+  let printer = [{ return ::print(p, *this); }];
+  let verifier = [{ return ::verify(*this); }];
+  let parser = [{ return ::parse$cppClass(parser, result); }];
+}
 
 def Common_Type : AnyTypeOf<[AnyInteger, AnyUnsignedInteger, AnyFloat, AnyComplex, FunctionType, AnyShaped, AnyVector, AnyTensor, AnyMemRef, AnyTuple]>;
+
+
 
 #endif // COMMON_DIALECT
