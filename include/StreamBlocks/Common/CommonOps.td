@@ -58,7 +58,6 @@ def ConstantOp : Common_Op<"constant",
 }
 
 
-
 def AddOp : Common_Op<"add",  [NoSideEffect,
                                     SameOperandsAndResultType]> {
     let summary = "element-wise addition operation";
@@ -74,5 +73,39 @@ def AddOp : Common_Op<"add",  [NoSideEffect,
     let parser = [{ return ::parseBinaryOp(parser, result); }];
     let printer = [{ return ::printBinaryOp(p, *this); }];
 }
+
+def SubOp : Common_Op<"sub",  [NoSideEffect,
+                                    SameOperandsAndResultType]> {
+    let summary = "element-wise subtraction operation";
+    let description = [{
+      The "sub" operation performs element-wise addition between two
+      elements.
+    }];
+
+    let arguments = (ins AnyType:$lhs, AnyType:$rhs);
+    let results = (outs AnyType);
+
+    // Specify a parser and printer method.
+    let parser = [{ return ::parseBinaryOp(parser, result); }];
+    let printer = [{ return ::printBinaryOp(p, *this); }];
+}
+
+def MulOp : Common_Op<"mul",  [NoSideEffect,
+                                    SameOperandsAndResultType]> {
+    let summary = "element-wise multiplication operation";
+    let description = [{
+      The "mul" operation performs element-wise addition between two
+      elements.
+    }];
+
+    let arguments = (ins AnyType:$lhs, AnyType:$rhs);
+    let results = (outs AnyType);
+
+    // Specify a parser and printer method.
+    let parser = [{ return ::parseBinaryOp(parser, result); }];
+    let printer = [{ return ::printBinaryOp(p, *this); }];
+}
+
+
 
 #endif // Common_OPS
