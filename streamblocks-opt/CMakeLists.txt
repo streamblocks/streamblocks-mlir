@@ -4,7 +4,6 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIROptLib
-        MLIRCommon
         MLIRDWF
         )
 add_llvm_executable(streamblocks-opt streamblocks-opt.cpp)

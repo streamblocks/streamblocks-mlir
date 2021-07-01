@@ -8,7 +8,28 @@
 
 #include "StreamBlocks/DWF/DWFOps.h"
 #include "StreamBlocks/DWF/DWFDialect.h"
-#include "mlir/IR/OpImplementation.h"
+
+using namespace mlir;
+
+using namespace streamblocks::dwf;
+
+static ParseResult parseActorOp(OpAsmParser &parser, OperationState &result){
+  return failure();
+}
+
+static void print(OpAsmPrinter &p, ActorOp op) {
+}
+
+
+static LogicalResult verifyActorOp(ActorOp op) {
+  // -- TODO : Implement
+  return success();
+}
+
+
+//===----------------------------------------------------------------------===//
+// TableGen'd op method definitions
+//===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "StreamBlocks/DWF/DWFOps.cpp.inc"

@@ -21,7 +21,6 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIROptLib
-        MLIRCommon
         MLIRDWF
         )
 

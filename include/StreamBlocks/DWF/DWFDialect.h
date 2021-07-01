@@ -9,8 +9,12 @@
 #ifndef DWF_DWFDIALECT_H
 #define DWF_DWFDIALECT_H
 
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 
+using namespace mlir;
+
 #include "StreamBlocks/DWF/DWFOpsDialect.h.inc"
+
 
 #endif // DWF_DWFDIALECT_H
