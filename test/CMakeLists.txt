@@ -5,16 +5,16 @@ configure_lit_site_cfg(
         ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-set(STREAMBLOCKS_TEST_DEPENDS
+set(CAL_TEST_DEPENDS
         FileCheck count not
-        streamblocks-opt
-        streamblocks-translate
+        cal-opt
+        cal-translate
         )
 
-add_lit_testsuite(check-streamblocks "Running the streamblocks regression tests"
+add_lit_testsuite(check-cal "Running the cal regression tests"
         ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${STREAMBLOCKS_TEST_DEPENDS}
+        DEPENDS ${CAL_TEST_DEPENDS}
         )
-set_target_properties(check-streamblocks PROPERTIES FOLDER "Tests")
+set_target_properties(check-cal PROPERTIES FOLDER "Tests")
 
-add_lit_testsuites(STREAMBLOCKS ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${STREAMBLOCKS_TEST_DEPENDS})
+add_lit_testsuites(CAL ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${CAL_TEST_DEPENDS})

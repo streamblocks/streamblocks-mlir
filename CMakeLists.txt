@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(streamblocks-mlir LANGUAGES CXX C)
+project(cal-dialect LANGUAGES CXX C)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
@@ -31,6 +31,6 @@ add_definitions(${LLVM_DEFINITIONS})
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
-add_subdirectory(streamblocks-opt)
-add_subdirectory(streamblocks-translate)
-add_subdirectory(streamblocks-compiler)
+add_subdirectory(cal-opt)
+add_subdirectory(cal-translate)
+add_subdirectory(cal-compiler)
