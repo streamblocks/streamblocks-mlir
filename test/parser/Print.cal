@@ -1,0 +1,19 @@
+namespace test:
+
+    actor Process() ==> :
+
+        do
+            begin
+            var
+                int i := 0
+            do
+                while i < 16 do
+                    i := i + 1;
+                    println(i);
+                end
+            end
+        end
+
+    end
+
+end
