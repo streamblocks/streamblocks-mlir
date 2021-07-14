@@ -1,41 +1,19 @@
 namespace test:
 
-import var test.jj=a;
+    actor Process() ==> :
 
-    type T: A(A X, int(size=b) Y) | B end
-
-    actor Source() ==> int O :
-
-        int Counter := 10;
-
-        action ==> O:[token]
-        guard
-            Counter < 16
-        var
-            int token = Counter
         do
-            Counter := Counter + 1;
+            begin
+            var
+                int i := 0
+            do
+                while i < 16 do
+                    i := i + 1;
+                    println(i);
+                end
+            end
         end
 
     end
-
-    actor Sink() int I ==> :
-
-        action I:[token] ==>
-        do
-            println(token);
-        end
-
-    end
-
-    network SourceSink() ==> :
-
-        entities
-            source = Source();
-            sink   = Sink();
-        structure
-            source.O --> sink.I;
-    end
-
 
 end

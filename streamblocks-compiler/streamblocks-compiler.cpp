@@ -2,6 +2,8 @@
 
 #include "driver.h"
 
+#include "StreamBlocks/DWF/DWFDialect.h"
+
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/AsmState.h"
@@ -203,11 +205,12 @@ int main(int argc, char *argv[]) {
     return dumpAST();
 
   // If we aren't dumping the AST, then we are compiling with/to MLIR.
-  /*
+
     mlir::MLIRContext context;
     // Load our Dialect in this MLIR Context.
-    context.getOrLoadDialect<mlir::toy::ToyDialect>();
-
+    context.getOrLoadDialect<mlir::StandardOpsDialect>();
+    context.getOrLoadDialect<streamblocks::dwf::DWFDialect>();
+/*
     mlir::OwningModuleRef module;
     if (int error = loadAndProcessMLIR(context, module))
       return error;

@@ -13,6 +13,24 @@ using namespace mlir;
 
 using namespace streamblocks::dwf;
 
+//===----------------------------------------------------------------------===//
+// NetworkOp
+
+static ParseResult parseNetworkOp(OpAsmParser &parser, OperationState &result){
+  return failure();
+}
+
+static void print(OpAsmPrinter &p, NetworkOp op) {
+}
+
+static LogicalResult verifyNetworkOp(NetworkOp op) {
+  // -- TODO : Implement
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ActorOp
+
 static ParseResult parseActorOp(OpAsmParser &parser, OperationState &result){
   return failure();
 }
@@ -20,8 +38,22 @@ static ParseResult parseActorOp(OpAsmParser &parser, OperationState &result){
 static void print(OpAsmPrinter &p, ActorOp op) {
 }
 
-
 static LogicalResult verifyActorOp(ActorOp op) {
+  // -- TODO : Implement
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ProcessOp
+
+static ParseResult parseProcessOp(OpAsmParser &parser, OperationState &result){
+  return failure();
+}
+
+static void print(OpAsmPrinter &p, ProcessOp op) {
+}
+
+static LogicalResult verifyProcessOp(ProcessOp op) {
   // -- TODO : Implement
   return success();
 }
