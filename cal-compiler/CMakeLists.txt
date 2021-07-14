@@ -28,6 +28,7 @@ include_directories(include)
 
 set(SOURCES
         parser/AST.cpp
+        compiler/MLIRGen.cpp
         cal-compiler.cpp
         )
 
