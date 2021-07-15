@@ -14,7 +14,9 @@
 #ifndef CAL_MLIRGEN_H_
 #define CAL_MLIRGEN_H_
 
+#include "AST/AST.h"
 #include <memory>
+
 
 namespace mlir {
 class MLIRContext;
@@ -27,7 +29,7 @@ class NamespaceDecl;
 /// Emit IR for the given Toy moduleAST, returns a newly created MLIR module
 /// or nullptr on failure.
 mlir::OwningModuleRef mlirGen(mlir::MLIRContext &context,
-                              NamespaceDecl &namespaceDecl);
+                              ::cal::NamespaceDecl &namespaceDecl);
 } // namespace streamblocks
 
 #endif // CAL_MLIRGEN_H_

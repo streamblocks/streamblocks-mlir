@@ -14,6 +14,7 @@
 #include "MLIRGen.h"
 #include "AST/AST.h"
 #include "Cal/CalDialect.h"
+#include "Cal/CalOps.h"
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -26,7 +27,6 @@
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/raw_ostream.h"
 #include <numeric>
-
 
 using namespace streamblocks::cal;
 
@@ -46,7 +46,24 @@ class MLIRGenImpl {
 public:
   MLIRGenImpl(mlir::MLIRContext &context) : builder(&context) {}
 
-  mlir::ModuleOp mlirGen(cal::NamespaceDecl &namespaceDecl) { return nullptr; }
+  mlir::ModuleOp mlirGen(cal::NamespaceDecl &namespaceDecl) {
+
+    theModule = mlir::ModuleOp::create(builder.getUnknownLoc());
+
+    for (auto &typeDecl : namespaceDecl.getTypeDecls()) {
+      // -- TODO : Implement me
+    }
+
+    for (auto &globalVar : namespaceDecl.getvarDecls()) {
+      // -- TODO : Implement me
+    }
+
+    for (auto &globalEntity : namespaceDecl.getEntityDecls()) {
+      auto entity = mlirGen(*globalEntity->getEntity());
+    }
+
+    return theModule;
+  }
 
 private:
   /// A "module" matches a Toy source file: containing a list of functions.
@@ -56,6 +73,25 @@ private:
   /// is stateful, in particular it keeps an "insertion point": this is where
   /// the next operations will be introduced.
   mlir::OpBuilder builder;
+
+  /// The symbol table maps a variable name to a value in the current scope.
+  /// Entering a function creates a new scope, and the function arguments are
+  /// added to the mapping. When the processing of a function is terminated, the
+  /// scope is destroyed and the mappings created in this scope are dropped.
+  llvm::ScopedHashTable<StringRef, std::pair<mlir::Value, ::cal::VarDecl *>>
+      symbolTable;
+  using SymbolTableScopeT =
+      llvm::ScopedHashTableScope<StringRef,
+                                 std::pair<mlir::Value, ::cal::VarDecl *>>;
+
+  llvm::StringMap<streamblocks::cal::ActorOp> actorMap;
+
+  streamblocks::cal::ActorOp mlirGen(cal::Entity &entity) {
+
+    streamblocks::cal::ActorOp actorOp();
+
+    return nullptr;
+  }
 };
 }; // namespace
 

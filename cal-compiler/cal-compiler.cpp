@@ -28,6 +28,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "MLIRGen.h"
+
 namespace cl = llvm::cl;
 
 static cl::opt<std::string> inputFilename(cl::Positional,
@@ -88,15 +90,15 @@ std::unique_ptr<::cal::NamespaceDecl> parseInputFile(llvm::StringRef filename) {
   }
 }
 
-/*
+
 int loadMLIR(mlir::MLIRContext &context, mlir::OwningModuleRef &module) {
   // Handle '.toy' input to the compiler.
   if (inputType != InputType::MLIR &&
       !llvm::StringRef(inputFilename).endswith(".mlir")) {
-    auto moduleAST = parseInputFile(inputFilename);
-    if (!moduleAST)
+    auto namespaceDecl = parseInputFile(inputFilename);
+    if (!namespaceDecl)
       return 6;
-    module = mlirGen(context, *moduleAST);
+    module = streamblocks::mlirGen(context, *namespaceDecl);
     return !module ? 1 : 0;
   }
 
@@ -118,7 +120,58 @@ int loadMLIR(mlir::MLIRContext &context, mlir::OwningModuleRef &module) {
   }
   return 0;
 }
-*/
+
+
+int loadAndProcessMLIR(mlir::MLIRContext &context,
+                       mlir::OwningModuleRef &module) {
+  if (int error = loadMLIR(context, module))
+    return error;
+
+  mlir::PassManager pm(&context);
+  // Apply any generic pass manager command line options and run the pipeline.
+  applyPassManagerCLOptions(pm);
+
+  // Check to see what granularity of MLIR we are compiling to.
+  bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
+  bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
+
+  if (enableOpt || isLoweringToAffine) {
+    // Inline all functions into main and then delete them.
+    pm.addPass(mlir::createInlinerPass());
+
+    // Now that there is only one function, we can infer the shapes of each of
+    // the operations.
+    mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
+    optPM.addPass(mlir::createCanonicalizerPass());
+    //optPM.addPass(mlir::toy::createShapeInferencePass());
+    optPM.addPass(mlir::createCanonicalizerPass());
+    optPM.addPass(mlir::createCSEPass());
+  }
+
+  if (isLoweringToAffine) {
+    mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
+
+    // Partially lower the toy dialect with a few cleanups afterwards.
+    //optPM.addPass(mlir::toy::createLowerToAffinePass());
+    optPM.addPass(mlir::createCanonicalizerPass());
+    optPM.addPass(mlir::createCSEPass());
+
+    // Add optimizations if enabled.
+    if (enableOpt) {
+      optPM.addPass(mlir::createLoopFusionPass());
+      //optPM.addPass(mlir::createAffineScalarReplacementPass());
+    }
+  }
+
+  if (isLoweringToLLVM) {
+    // Finish lowering the toy IR to the LLVM dialect.
+    //pm.addPass(mlir::toy::createLowerToLLVMPass());
+  }
+
+  if (mlir::failed(pm.run(*module)))
+    return 4;
+  return 0;
+}
 
 int dumpAST() {
   if (inputType == InputType::MLIR) {
@@ -211,7 +264,7 @@ int main(int argc, char *argv[]) {
     // Load our Dialect in this MLIR Context.
     context.getOrLoadDialect<mlir::StandardOpsDialect>();
     context.getOrLoadDialect<streamblocks::cal::CalDialect>();
-/*
+
     mlir::OwningModuleRef module;
     if (int error = loadAndProcessMLIR(context, module))
       return error;
@@ -230,7 +283,7 @@ int main(int argc, char *argv[]) {
     // Otherwise, we must be running the jit.
     if (emitAction == Action::RunJIT)
       return runJit(*module);
-  */
+
   llvm::errs() << "No action specified (parsing only?), use -emit=<action>\n";
   return -1;
 }
