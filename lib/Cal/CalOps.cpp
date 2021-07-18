@@ -15,50 +15,61 @@ using namespace mlir;
 using namespace streamblocks::cal;
 
 //===----------------------------------------------------------------------===//
+// NamespaceOp
+static LogicalResult verifyNamespaceOp(NamespaceOp op) {
+  // -- TODO : Implement
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // NetworkOp
 
-static ParseResult parseNetworkOp(OpAsmParser &parser, OperationState &result){
-    return failure();
+static ParseResult parseNetworkOp(OpAsmParser &parser, OperationState &result) {
+  return failure();
 }
 
-static void print(OpAsmPrinter &p, NetworkOp op) {
-}
+static void print(OpAsmPrinter &p, NetworkOp op) {}
 
 static LogicalResult verifyNetworkOp(NetworkOp op) {
-    // -- TODO : Implement
-    return success();
+  // -- TODO : Implement
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // ActorOp
 
-static ParseResult parseActorOp(OpAsmParser &parser, OperationState &result){
+static ParseResult parseActorOp(OpAsmParser &parser, OperationState &result) {
+
+  using namespace mlir::function_like_impl;
+
+  StringAttr actorName;
+  if (parser.parseSymbolName(actorName, SymbolTable::getSymbolAttrName(),
+                             result.attributes))
     return failure();
+
+  return success();
 }
 
-static void print(OpAsmPrinter &p, ActorOp op) {
-}
+static void print(OpAsmPrinter &p, ActorOp op) {}
 
 static LogicalResult verifyActorOp(ActorOp op) {
-    // -- TODO : Implement
-    return success();
+  // -- TODO : Implement
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // ProcessOp
 
-static ParseResult parseProcessOp(OpAsmParser &parser, OperationState &result){
-    return failure();
+static ParseResult parseProcessOp(OpAsmParser &parser, OperationState &result) {
+  return success();
 }
 
-static void print(OpAsmPrinter &p, ProcessOp op) {
-}
+static void print(OpAsmPrinter &p, ProcessOp op) {}
 
 static LogicalResult verifyProcessOp(ProcessOp op) {
-    // -- TODO : Implement
-    return success();
+  // -- TODO : Implement
+  return success();
 }
-
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions

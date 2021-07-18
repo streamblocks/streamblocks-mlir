@@ -40,7 +40,23 @@ def Cal_Dialect : Dialect {
 // Base cal operation definition.
 //===----------------------------------------------------------------------===//
 
-class Cal_Op<string mnemonic, list<OpTrait> traits = []> :
-        Op<Cal_Dialect, mnemonic, traits>;
+/// Base class for the operation in this dialect
+class CalOp<string mnemonic, list<OpTrait> traits = []> :
+    Op<Cal_Dialect, mnemonic, traits>;
+
+class CalContainer<string mnemonic, list<OpTrait> traits = []> :
+    CalOp<mnemonic, !listconcat(traits, [
+            NoRegionArguments,
+            NoTerminator,
+            SingleBlock
+    ])> {
+    let assemblyFormat = "$body attr-dict";
+    let regions = (region SizedRegion<1>: $body);
+
+    let extraClassDeclaration = [{
+    /// Returns the body of a Cal container.
+    Block *getBody() { return &getOperation()->getRegion(0).front(); }
+    }];
+}
 
 #endif // CAL_DIALECT
