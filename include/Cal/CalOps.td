@@ -165,6 +165,10 @@ def ActorOp: CalOp<"actor", [
     let results = (outs);
     let regions = (region SizedRegion<1>: $body);
 
+    let builders = [
+        OpBuilder<(ins "StringAttr":$name)>
+    ];
+
     let extraClassDeclaration = [{
         using FunctionLike::front;
         using FunctionLike::getBody;

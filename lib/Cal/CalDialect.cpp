@@ -12,7 +12,7 @@
 using namespace mlir;
 using namespace streamblocks::cal;
 
-#include "Cal/CalOpsDialect.cpp.inc"
+#include "Cal/CalOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // Cal dialect.
