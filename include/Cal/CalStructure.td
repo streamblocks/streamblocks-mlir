@@ -6,11 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CAL_OPS
-#define CAL_OPS
-
-include "CalDialect.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def Cal_FooOp : CalOp<"foo", [NoSideEffect,
                                              SameOperandsAndResultType]> {
@@ -271,5 +266,3 @@ def ProcessOp: CalOp<"process",
 }
 
 
-
-#endif // CAL_OPS

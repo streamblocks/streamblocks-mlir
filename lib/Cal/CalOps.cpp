@@ -76,4 +76,4 @@ static LogicalResult verifyProcessOp(ProcessOp op) {
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "Cal/CalOps.cpp.inc"
+#include "Cal/Cal.cpp.inc"

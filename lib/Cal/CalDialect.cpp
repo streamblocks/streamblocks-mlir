@@ -12,15 +12,16 @@
 using namespace mlir;
 using namespace streamblocks::cal;
 
-#include "Cal/CalOps.cpp.inc"
+#include "Cal/CalDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // Cal dialect.
 //===----------------------------------------------------------------------===//
 
 void CalDialect::initialize() {
+  // Register operations.
   addOperations<
 #define GET_OP_LIST
-#include "Cal/CalOps.cpp.inc"
-      >();
+#include "Cal/Cal.cpp.inc"
+  >();
 }

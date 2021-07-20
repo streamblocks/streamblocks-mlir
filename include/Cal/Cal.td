@@ -1,4 +1,4 @@
-//===- CalDialect.td - Cal dialect -----------*- tablegen -*-===//
+//===- Cal.td - Cal dialect -----------*- tablegen -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -21,7 +21,7 @@ include "mlir/IR/RegionKindInterface.td"
 // Cal dialect definition.
 //===----------------------------------------------------------------------===//
 
-def Cal_Dialect : Dialect {
+def CalDialect : Dialect {
     let name = "cal";
     let summary = "A cal out-of-tree MLIR dialect.";
     let description = [{
@@ -42,7 +42,7 @@ def Cal_Dialect : Dialect {
 
 /// Base class for the operation in this dialect
 class CalOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<Cal_Dialect, mnemonic, traits>;
+    Op<CalDialect, mnemonic, traits>;
 
 class CalContainer<string mnemonic, list<OpTrait> traits = []> :
     CalOp<mnemonic, !listconcat(traits, [
@@ -58,5 +58,7 @@ class CalContainer<string mnemonic, list<OpTrait> traits = []> :
     Block *getBody() { return &getOperation()->getRegion(0).front(); }
     }];
 }
+
+include "CalStructure.td"
 
 #endif // CAL_DIALECT
