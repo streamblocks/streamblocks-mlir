@@ -24,7 +24,7 @@ public:
   std::unique_ptr<cal::NamespaceDecl> result;
 
   // Run the parser on file F.  Return 0 on success.
-  int parse (const std::string& f){
+  int parse (const std::string f){
     file = f;
     location.initialize (&file);
     scan_begin ();

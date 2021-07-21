@@ -7,6 +7,7 @@
 %define api.token.constructor
 %define api.value.automove
 %define api.value.type variant
+%define api.filename.type "const std::string"
 
 
 %code requires {
@@ -362,6 +363,7 @@ namespace_decl:
     "namespace" qid ":" namespace_decl_default "end"
     {
         auto ns = $4;
+        ns->setLocation(@$);
         ns->setQID($2);
         $$ = std::move(ns);
     }

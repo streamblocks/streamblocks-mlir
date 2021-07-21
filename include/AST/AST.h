@@ -3090,7 +3090,9 @@ public:
     return typeDecl;
   }
 
-  void setLocation(Location location_) { location = location_; }
+  void setLocation(Location location_) {
+    location = location_;
+  }
 
   void addImport(std::unique_ptr<Import> import) {
     imports.push_back(std::move(import));

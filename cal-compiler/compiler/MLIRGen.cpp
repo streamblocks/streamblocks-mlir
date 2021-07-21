@@ -50,6 +50,8 @@ public:
 
     theModule = mlir::ModuleOp::create(builder.getUnknownLoc());
 
+    auto theNamespace = builder.create<NamespaceOp>(loc(namespaceDecl.loc()));
+
     for (auto &typeDecl : namespaceDecl.getTypeDecls()) {
       // -- TODO : Implement me
     }
@@ -61,6 +63,8 @@ public:
     for (auto &globalEntity : namespaceDecl.getEntityDecls()) {
       auto entity = mlirGen(*globalEntity->getEntity());
     }
+
+    theModule.push_back(theNamespace);
 
     return theModule;
   }
@@ -91,6 +95,14 @@ private:
     streamblocks::cal::ActorOp actorOp();
 
     return nullptr;
+  }
+
+  /// Helper conversion for a Cal AST location to an MLIR location.
+
+  mlir::Location loc(cal::location loc) {
+    return mlir::FileLineColLoc::get(
+        builder.getIdentifier(llvm::Twine(*loc.begin.filename)), loc.begin.line,
+        loc.begin.column);
   }
 };
 }; // namespace

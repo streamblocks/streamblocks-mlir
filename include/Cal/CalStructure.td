@@ -58,74 +58,48 @@ def NamespaceOp : CalContainer<"namespace", [
 //===----------------------------------------------------------------------===//
 // NetworkOp
 
-def NetworkOp: CalOp<"network",
-    [FunctionLike, Symbol, RegionKindInterface,
-           HasParent<"mlir::ModuleOp">]>{
-    let summary = "A network of actors";
+def NetworkOp: CalOp<"network", [
+        HasParent<"NamespaceOp">,
+        Symbol,
+        FunctionLike,
+        IsolatedFromAbove,
+        SingleBlock,
+        NoTerminator
+    ]>{
+
+    let summary = "A Cal Network";
 
     let description = [{
-        The "dwf.network" operation represents an actor with a Dataflow with Firing
-        model of computation.
+        The "cal.network" operation represents a network of actors.
     }];
 
-    let arguments = (ins StrArrayAttr:$argNames, StrArrayAttr:$resultNames);
+    let arguments = (ins
+        ArrayAttr:$inPortNames,
+        ArrayAttr:$outPortNames
+    );
     let results = (outs);
-    let regions = (region SizedRegion<1>:$body);
+    let regions = (region SizedRegion<1>: $body);
 
-     let skipDefaultBuilders = 1;
-      let builders = [
-        OpBuilder<(ins "StringAttr":$name,
-                       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
-      ];
+    let builders = [
+        OpBuilder<(ins "StringAttr":$name)>
+    ];
 
     let extraClassDeclaration = [{
         using FunctionLike::front;
         using FunctionLike::getBody;
 
-        // Implement RegionKindInterface.
-        static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph;}
+        private:
+            // This trait needs access to the hooks defined below.
+            friend class OpTrait::FunctionLike<NetworkOp>;
 
-        // Decode information about the input and output ports on this module.
-        //SmallVector<ModulePortInfo> getPorts() {
-        //  return getModulePortInfo(*this);
-        //}
+            /// Hooks for the input/output type enumeration in FunctionLike.
+            unsigned getNumFuncArguments() { return getType().getNumInputs(); }
+            unsigned getNumFuncResults() { return getType().getNumResults(); }
 
-        // TODO(mlir): FunctionLike shouldn't produce a getBody() helper, it is
-        // squatting on the name.
-        Block *getBodyBlock() { return &body().front(); }
+        public:
+            /// Returns the body of a Calyx component.
+            Block *getBody() { return &getOperation()->getRegion(0).front(); }
 
-        // Get the module's symbolic name as StringAttr.
-        StringAttr getNameAttr() {
-          return (*this)->getAttrOfType<StringAttr>(
-            ::mlir::SymbolTable::getSymbolAttrName());
-        }
-
-        // Get the module's symbolic name.
-        StringRef getName() {
-          return getNameAttr().getValue();
-        }
-
-      private:
-        // This trait needs access to the hooks defined below.
-        friend class OpTrait::FunctionLike<NetworkOp>;
-
-        /// Returns the number of arguments, implementing OpTrait::FunctionLike.
-        unsigned getNumFuncArguments() { return getType().getInputs().size(); }
-        /// Returns the number of results, implementing OpTrait::FunctionLike.
-        unsigned getNumFuncResults() { return getType().getResults().size(); }
-
-        /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
-        /// attribute is present and checks if it holds a function type.  Ensures
-        /// getType, getNumFuncArguments, and getNumFuncResults can be called
-        ///  safely.
-        LogicalResult verifyType() {
-          auto type = getTypeAttr().getValue();
-          if (!type.isa<FunctionType>())
-            return emitOpError("requires '" + getTypeAttrName() +
-                               "' attribute of function type");
-          return success();
-        }
-      public:
       }];
 
     let printer = "return ::print(p, *this);";
@@ -161,7 +135,7 @@ def ActorOp: CalOp<"actor", [
     let regions = (region SizedRegion<1>: $body);
 
     let builders = [
-        OpBuilder<(ins "StringAttr":$name)>
+        OpBuilder<(ins "StringAttr":$name, "ArrayRef<PortInfo>":$ports)>
     ];
 
     let extraClassDeclaration = [{
@@ -188,81 +162,49 @@ def ActorOp: CalOp<"actor", [
 }
 
 //===----------------------------------------------------------------------===//
-// ActorOp
+// ProcessOp
 
-def ProcessOp: CalOp<"process",
-    [FunctionLike, Symbol, RegionKindInterface,
-           HasParent<"ActorOp">, SingleBlock, NoTerminator]>{
+def ProcessOp: CalContainer<"process", [
+    HasParent<"ActorOp">
+    ]>{
     let summary = "A KPN Process description";
 
     let description = [{
-        The "dwf.process" operation represents an actor with a Dataflow with Firing
+        The "cal.process" operation represents an actor with a Dataflow with Firing
         model of computation.
     }];
 
-    let arguments = (ins StrArrayAttr:$argNames, StrArrayAttr:$resultNames);
+    let arguments = (ins);
     let results = (outs);
     let regions = (region SizedRegion<1>:$body);
-
-     let skipDefaultBuilders = 1;
-      let builders = [
-        OpBuilder<(ins "StringAttr":$name,
-                       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
-      ];
-
-    let extraClassDeclaration = [{
-        using FunctionLike::front;
-        using FunctionLike::getBody;
-
-        // Implement RegionKindInterface.
-        static RegionKind getRegionKind(unsigned index) { return RegionKind::SSACFG;}
-
-        // Decode information about the input and output ports on this module.
-        //SmallVector<ModulePortInfo> getPorts() {
-        //  return getModulePortInfo(*this);
-        //}
-
-        // TODO(mlir): FunctionLike shouldn't produce a getBody() helper, it is
-        // squatting on the name.
-        Block *getBodyBlock() { return &body().front(); }
-
-        // Get the module's symbolic name as StringAttr.
-        StringAttr getNameAttr() {
-          return (*this)->getAttrOfType<StringAttr>(
-            ::mlir::SymbolTable::getSymbolAttrName());
-        }
-
-        // Get the module's symbolic name.
-        StringRef getName() {
-          return getNameAttr().getValue();
-        }
-
-      private:
-        // This trait needs access to the hooks defined below.
-        friend class OpTrait::FunctionLike<ProcessOp>;
-
-        /// Returns the number of arguments, implementing OpTrait::FunctionLike.
-        unsigned getNumFuncArguments() { return getType().getInputs().size(); }
-        /// Returns the number of results, implementing OpTrait::FunctionLike.
-        unsigned getNumFuncResults() { return getType().getResults().size(); }
-
-        /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
-        /// attribute is present and checks if it holds a function type.  Ensures
-        /// getType, getNumFuncArguments, and getNumFuncResults can be called
-        ///  safely.
-        LogicalResult verifyType() {
-          auto type = getTypeAttr().getValue();
-          if (!type.isa<FunctionType>())
-            return emitOpError("requires '" + getTypeAttrName() +
-                               "' attribute of function type");
-          return success();
-        }
-      public:
-      }];
-
-    let printer = "return ::print(p, *this);";
-    let parser = "return ::parse$cppClass(parser, result);";
-    let verifier = "return ::verify$cppClass(*this);";
 }
 
+//===----------------------------------------------------------------------===//
+// PrintOp
 
+def PrintOp : CalOp<"print"> {
+  let summary = "print operation";
+  let description = [{
+    The "cal.print" builtin operation prints a value, and produces
+    no results.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$input);
+
+  let assemblyFormat = "$input attr-dict `:` type($input)";
+}
+
+//===----------------------------------------------------------------------===//
+// PrintOp
+
+def PrintlnOp : CalOp<"println"> {
+  let summary = "println operation";
+  let description = [{
+    The "cal.println" builtin operation prints a value and adds a new
+    line to output, and produces no results.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$input);
+
+  let assemblyFormat = "$input attr-dict `:` type($input)";
+}

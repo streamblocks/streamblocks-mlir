@@ -1,0 +1,9 @@
+namespace test:
+
+    actor Println() ==> :
+        do
+            println(42);
+        end
+    end
+
+end

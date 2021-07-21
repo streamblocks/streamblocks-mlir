@@ -23,16 +23,16 @@ include "mlir/IR/RegionKindInterface.td"
 
 def CalDialect : Dialect {
     let name = "cal";
-    let summary = "A cal out-of-tree MLIR dialect.";
+    let summary = "Cal dialect.";
     let description = [{
-        This dialect is an example of an out-of-tree MLIR dialect designed to
-        illustrate the basic setup required to develop MLIR-based tools without
-        working inside of the LLVM source tree.
+        Cal is a general purpose dataflow programming language.
     }];
     let cppNamespace = "::streamblocks::cal";
     let extraClassDeclaration = [{
     /// Register all Cal types.
     void registerTypes();
+    /// Register all Cal attributes.
+    void registerAttributes();
     }];
 }
 

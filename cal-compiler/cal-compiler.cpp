@@ -73,6 +73,8 @@ static cl::opt<enum Action> emitAction(
 
 static cl::opt<bool> enableOpt("opt", cl::desc("Enable optimizations"));
 
+static driver drv;
+
 std::unique_ptr<::cal::NamespaceDecl> parseInputFile(llvm::StringRef filename) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(filename);
@@ -81,7 +83,7 @@ std::unique_ptr<::cal::NamespaceDecl> parseInputFile(llvm::StringRef filename) {
     return nullptr;
   }
 
-  driver drv;
+
   if (!drv.parse(std::string(filename))) {
     return std::move(drv.result);
   } else {
