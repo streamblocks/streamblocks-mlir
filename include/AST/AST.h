@@ -384,6 +384,18 @@ public:
 
   const Location &loc() { return location; }
 
+  llvm::ArrayRef<std::unique_ptr<PortDecl>> getInputs() { return inputPorts; }
+
+  llvm::ArrayRef<std::unique_ptr<PortDecl>> getOutputs() { return outputPorts; }
+
+  llvm::ArrayRef<std::unique_ptr<ParameterTypeDecl>> gettypeParameters() {
+    return typeParameters;
+  }
+
+  llvm::ArrayRef<std::unique_ptr<ParameterVarDecl>> getValueParameters() {
+    return valueParameters;
+  }
+
 private:
   const EntityKind kind;
   Location location;
@@ -671,8 +683,8 @@ public:
   LocalVarDecl(Location location, std::string name,
                std::unique_ptr<TypeExpr> type,
                std::unique_ptr<Expression> value, bool constant)
-      : VarDecl(location, std::move(name), std::move(type), std::move(value), constant,
-                false) {}
+      : VarDecl(location, std::move(name), std::move(type), std::move(value),
+                constant, false) {}
 
   std::unique_ptr<Decl> clone() const override {
     return std::make_unique<LocalVarDecl>(loc(), llvm::Twine(getName()).str(),
@@ -3090,9 +3102,7 @@ public:
     return typeDecl;
   }
 
-  void setLocation(Location location_) {
-    location = location_;
-  }
+  void setLocation(Location location_) { location = location_; }
 
   void addImport(std::unique_ptr<Import> import) {
     imports.push_back(std::move(import));

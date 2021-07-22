@@ -22,6 +22,21 @@ static LogicalResult verifyNamespaceOp(NamespaceOp op) {
   return success();
 }
 
+
+void NamespaceOp::build(OpBuilder &builder, OperationState &result, StringAttr name) {
+  using namespace mlir::function_like_impl;
+
+  // Namespace QID
+  result.addAttribute(::mlir::SymbolTable::getSymbolAttrName(), name);
+
+  // Create a single-blocked region.
+  result.addRegion();
+  Region *regionBody = result.regions[0].get();
+  Block *block = new Block();
+  regionBody->push_back(block);
+
+}
+
 //===----------------------------------------------------------------------===//
 // NetworkOp
 
@@ -201,6 +216,47 @@ static void print(OpAsmPrinter &p, ActorOp op) {
 static LogicalResult verifyActorOp(ActorOp op) {
   // -- TODO : Implement
   return success();
+}
+
+void ActorOp::build(OpBuilder &builder, OperationState &result, StringAttr name,
+                    ArrayRef<PortInfo> ports) {
+  using namespace mlir::function_like_impl;
+
+  result.addAttribute(::mlir::SymbolTable::getSymbolAttrName(), name);
+
+  SmallVector<Type, 4> inPortTypes, outPortTypes;
+  SmallVector<Attribute, 4> inPortNames, outPortNames;
+
+  for (auto &&port : ports) {
+    if (port.direction == PortDirection::INPUT) {
+      inPortTypes.push_back(port.type);
+      inPortNames.push_back(port.name);
+    } else {
+      outPortTypes.push_back(port.type);
+      outPortNames.push_back(port.name);
+    }
+  }
+
+  // Build the function type of the component.
+  auto functionType = builder.getFunctionType(inPortTypes, outPortTypes);
+  result.addAttribute(getTypeAttrName(), TypeAttr::get(functionType));
+
+  // Record the port names of the component.
+  result.addAttribute("inPortNames", builder.getArrayAttr(inPortNames));
+  result.addAttribute("outPortNames", builder.getArrayAttr(outPortNames));
+
+  // Create a single-blocked region.
+  result.addRegion();
+  Region *regionBody = result.regions[0].get();
+  Block *block = new Block();
+  regionBody->push_back(block);
+
+  // Add input ports to the body block.
+  for (auto port : ports) {
+    if (port.direction == PortDirection::OUTPUT)
+      continue;
+    block->addArgument(port.type);
+  }
 }
 
 //===----------------------------------------------------------------------===//

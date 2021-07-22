@@ -51,6 +51,10 @@ def NamespaceOp : CalContainer<"namespace", [
 
     let arguments = (ins);
 
+     let builders = [
+        OpBuilder<(ins "StringAttr":$name)>
+      ];
+
     let verifier = "return ::verify$cppClass(*this);";
 
 }

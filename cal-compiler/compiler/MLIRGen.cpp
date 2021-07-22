@@ -50,7 +50,8 @@ public:
 
     theModule = mlir::ModuleOp::create(builder.getUnknownLoc());
 
-    auto theNamespace = builder.create<NamespaceOp>(loc(namespaceDecl.loc()));
+    StringAttr qid = StringAttr::get(builder.getContext(), namespaceDecl.getQID()->toString());
+    auto theNamespace = builder.create<NamespaceOp>(loc(namespaceDecl.loc()), qid);
 
     for (auto &typeDecl : namespaceDecl.getTypeDecls()) {
       // -- TODO : Implement me
@@ -62,6 +63,7 @@ public:
 
     for (auto &globalEntity : namespaceDecl.getEntityDecls()) {
       auto entity = mlirGen(*globalEntity->getEntity());
+      theNamespace.push_back(entity);
     }
 
     theModule.push_back(theNamespace);
@@ -78,6 +80,7 @@ private:
   /// the next operations will be introduced.
   mlir::OpBuilder builder;
 
+
   /// The symbol table maps a variable name to a value in the current scope.
   /// Entering a function creates a new scope, and the function arguments are
   /// added to the mapping. When the processing of a function is terminated, the
@@ -92,9 +95,18 @@ private:
 
   streamblocks::cal::ActorOp mlirGen(cal::Entity &entity) {
 
-    streamblocks::cal::ActorOp actorOp();
+    // Get entity name
+    StringAttr name = StringAttr::get(builder.getContext(), entity.getName());
 
-    return nullptr;
+    auto inputPorts = entity.getInputs();
+
+    auto outputPorts = entity.getOutputs();
+
+    auto theActor = builder.create<ActorOp>(loc(entity.loc()), name, ArrayRef<PortInfo>() );
+
+
+
+    return theActor;
   }
 
   /// Helper conversion for a Cal AST location to an MLIR location.
