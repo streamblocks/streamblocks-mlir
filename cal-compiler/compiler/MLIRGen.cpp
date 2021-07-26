@@ -50,8 +50,10 @@ public:
 
     theModule = mlir::ModuleOp::create(builder.getUnknownLoc());
 
-    StringAttr qid = StringAttr::get(builder.getContext(), namespaceDecl.getQID()->toString());
-    auto theNamespace = builder.create<NamespaceOp>(loc(namespaceDecl.loc()), qid);
+    StringAttr qid = StringAttr::get(builder.getContext(),
+                                     namespaceDecl.getQID()->toString());
+    auto theNamespace =
+        builder.create<NamespaceOp>(loc(namespaceDecl.loc()), qid);
 
     for (auto &typeDecl : namespaceDecl.getTypeDecls()) {
       // -- TODO : Implement me
@@ -62,8 +64,20 @@ public:
     }
 
     for (auto &globalEntity : namespaceDecl.getEntityDecls()) {
-      auto entity = mlirGen(*globalEntity->getEntity());
-      theNamespace.push_back(entity);
+
+      switch (globalEntity->getEntity()->getKind()) {
+      case cal::Entity::Entity_Actor:
+      {
+        auto entity = mlirGen(cast<cal::CalActor>(*globalEntity->getEntity()));
+        theNamespace.push_back(entity);
+      }
+        break;
+      default:
+        emitError(loc(globalEntity->getEntity()->loc()))
+            << "MLIR codegen encountered an unhandled Global Entity kind '"
+            << Twine(globalEntity->getEntity()->getKind()) << "'";
+        return nullptr;
+      }
     }
 
     theModule.push_back(theNamespace);
@@ -80,7 +94,6 @@ private:
   /// the next operations will be introduced.
   mlir::OpBuilder builder;
 
-
   /// The symbol table maps a variable name to a value in the current scope.
   /// Entering a function creates a new scope, and the function arguments are
   /// added to the mapping. When the processing of a function is terminated, the
@@ -93,18 +106,39 @@ private:
 
   llvm::StringMap<streamblocks::cal::ActorOp> actorMap;
 
-  streamblocks::cal::ActorOp mlirGen(cal::Entity &entity) {
+  streamblocks::cal::ActorOp mlirGen(cal::CalActor &actor) {
 
     // Get entity name
-    StringAttr name = StringAttr::get(builder.getContext(), entity.getName());
+    StringAttr name = StringAttr::get(builder.getContext(), actor.getName());
 
-    auto inputPorts = entity.getInputs();
+    auto inputPorts = actor.getInputs();
 
-    auto outputPorts = entity.getOutputs();
+    auto outputPorts = actor.getOutputs();
 
-    auto theActor = builder.create<ActorOp>(loc(entity.loc()), name, ArrayRef<PortInfo>() );
+    // Create an Actor operation
+    auto theActor =
+        builder.create<ActorOp>(loc(actor.loc()), name, ArrayRef<PortInfo>());
+
+    // Is this a Process ? then create one and exit
+    if (actor.getProcess() != nullptr){
+      // Get actor process
+      cal::ProcessDescription *process = actor.getProcess();
+
+      // Create a Process operation
+      auto theProcess = builder.create<ProcessOp>(loc(actor.getProcess()->loc()));
+
+      // Visit its statements and create an operation for each
 
 
+    }
+
+    // State Variables
+
+    // Actions
+
+    // Priorities
+
+    // Action Schedule
 
     return theActor;
   }
