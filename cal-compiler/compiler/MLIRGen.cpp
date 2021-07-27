@@ -66,12 +66,10 @@ public:
     for (auto &globalEntity : namespaceDecl.getEntityDecls()) {
 
       switch (globalEntity->getEntity()->getKind()) {
-      case cal::Entity::Entity_Actor:
-      {
+      case cal::Entity::Entity_Actor: {
         auto entity = mlirGen(cast<cal::CalActor>(*globalEntity->getEntity()));
         theNamespace.push_back(entity);
-      }
-        break;
+      } break;
       default:
         emitError(loc(globalEntity->getEntity()->loc()))
             << "MLIR codegen encountered an unhandled Global Entity kind '"
@@ -106,6 +104,64 @@ private:
 
   llvm::StringMap<streamblocks::cal::ActorOp> actorMap;
 
+  mlir::Value mlirGen(cal::ExprLiteralLong &literal) {
+    return builder.create<ConstantOp>(loc(literal.loc()), literal.getValue());
+  }
+
+  mlir::Value mlirGen(cal::Expression &expr) {
+
+    switch (expr.getKind()) {
+    case cal::Expression::Expr_Literal_Long:
+      return mlirGen(cast<cal::ExprLiteralLong>(expr));
+    default:
+      emitError(loc(expr.loc()))
+          << "MLIR codegen encountered an unhandled expr kind '"
+          << Twine(expr.getKind()) << "'";
+    }
+  }
+
+  Operation *mlirGen(cal::StmtCall &call) {
+    auto location = loc(call.loc());
+
+    Operation *op;
+    // Codegen the operands
+    SmallVector<mlir::Value, 4> operands;
+    for (auto &expr : call.getArguments()) {
+      auto arg = mlirGen(*expr);
+      if (!arg) {
+        return nullptr;
+      }
+      operands.push_back(arg);
+    }
+
+    // Check if its a print or println
+    if (operands.size() == 1) {
+      if (call.getProcedure()->getKind() == cal::Expression::Expr_Variable) {
+        cal::ExprVariable *callee =
+            cast<cal::ExprVariable>(call.getProcedure());
+        if (callee->getName() == "println") {
+          op = builder.create<PrintlnOp>(location, operands[0]);
+        } else if (callee->getName() == "print") {
+          op = builder.create<PrintOp>(location, operands[0]);
+        }
+      }
+    }
+
+    return op;
+  }
+
+  Operation *mlirGen(cal::Statement &stmt) {
+    switch (stmt.getKind()) {
+    case cal::Statement::Stmt_Call:
+      return mlirGen(cast<cal::StmtCall>(stmt));
+    default:
+      emitError(loc(stmt.loc())) << "Statement not currently supported '"
+                                 << Twine(stmt.getKind()) << "'";
+    }
+
+    return nullptr;
+  }
+
   streamblocks::cal::ActorOp mlirGen(cal::CalActor &actor) {
 
     // Get entity name
@@ -120,16 +176,23 @@ private:
         builder.create<ActorOp>(loc(actor.loc()), name, ArrayRef<PortInfo>());
 
     // Is this a Process ? then create one and exit
-    if (actor.getProcess() != nullptr){
+    if (actor.getProcess() != nullptr) {
       // Get actor process
       cal::ProcessDescription *process = actor.getProcess();
 
       // Create a Process operation
-      auto theProcess = builder.create<ProcessOp>(loc(actor.getProcess()->loc()));
+      BoolAttr repeat =
+          BoolAttr::get(builder.getContext(), process->getRepeated());
+      auto theProcess =
+          builder.create<ProcessOp>(loc(actor.getProcess()->loc()), repeat);
 
       // Visit its statements and create an operation for each
+      for (auto &stmt : process->getStatements()) {
+        auto *op = mlirGen(*stmt);
+        theProcess.push_back(op);
+      }
 
-
+      theActor.getBody()->push_back(theProcess);
     }
 
     // State Variables

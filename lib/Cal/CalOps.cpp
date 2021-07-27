@@ -22,8 +22,8 @@ static LogicalResult verifyNamespaceOp(NamespaceOp op) {
   return success();
 }
 
-
-void NamespaceOp::build(OpBuilder &builder, OperationState &result, StringAttr name) {
+void NamespaceOp::build(OpBuilder &builder, OperationState &result,
+                        StringAttr name) {
   using namespace mlir::function_like_impl;
 
   // Namespace QID
@@ -34,7 +34,6 @@ void NamespaceOp::build(OpBuilder &builder, OperationState &result, StringAttr n
   Region *regionBody = result.regions[0].get();
   Block *block = new Block();
   regionBody->push_back(block);
-
 }
 
 //===----------------------------------------------------------------------===//
@@ -271,6 +270,58 @@ static void print(OpAsmPrinter &p, ProcessOp op) {}
 static LogicalResult verifyProcessOp(ProcessOp op) {
   // -- TODO : Implement
   return success();
+}
+
+void ProcessOp::build(mlir::OpBuilder &builder, mlir::OperationState &result, BoolAttr repeat){
+
+  using namespace mlir::function_like_impl;
+
+  // Is it a repeat process ?
+  result.addAttribute("repeat", repeat);
+
+  // Create a single-blocked region.
+  result.addRegion();
+  Region *regionBody = result.regions[0].get();
+  Block *block = new Block();
+  regionBody->push_back(block);
+}
+
+//===----------------------------------------------------------------------===//
+// ConstantOp
+static ParseResult parseConstantOp(OpAsmParser &parser,
+                                   OperationState &result) {
+  Attribute valueAttr;
+  if (parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseAttribute(valueAttr, "value", result.attributes))
+    return failure();
+
+  // If the attribute is a symbol reference or array, then we expect a trailing
+  // type.
+  Type type;
+  if (!valueAttr.isa<SymbolRefAttr, ArrayAttr>())
+    type = valueAttr.getType();
+  else if (parser.parseColonType(type))
+    return failure();
+
+  // Add the attribute type to the list.
+  return parser.addTypeToList(type, result.types);
+}
+
+static void print(OpAsmPrinter &printer, ConstantOp op) {
+  printer << "cal.constant";
+  printer.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
+  printer << op.value();
+}
+
+static LogicalResult verifyConstantOp(ConstantOp op) {
+  // -- TODO : Implement
+  return success();
+}
+
+void ConstantOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
+                       long value) {
+  Type type = builder.getI32Type();
+  ConstantOp::build(builder, state, type, builder.getIntegerAttr(type, value));
 }
 
 //===----------------------------------------------------------------------===//

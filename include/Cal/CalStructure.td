@@ -23,9 +23,9 @@ def NamespaceOp : CalContainer<"namespace", [
 
     let arguments = (ins);
 
-     let builders = [
+    let builders = [
         OpBuilder<(ins "StringAttr":$name)>
-      ];
+    ];
 
     let verifier = "return ::verify$cppClass(*this);";
 
@@ -152,7 +152,11 @@ def ProcessOp: CalContainer<"process", [
 
     let arguments = (ins);
     let results = (outs);
-    let regions = (region SizedRegion<1>:$body);
+
+    let builders = [
+            OpBuilder<(ins "BoolAttr":$repeat)>
+    ];
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,4 +187,34 @@ def PrintlnOp : CalOp<"println"> {
   let arguments = (ins Variadic<AnyType>:$input);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
+}
+
+def ConstantOp : CalOp<"constant", [ConstantLike, NoSideEffect]> {
+    let summary = "constant";
+    let description = [{
+        Constant operation turns a literal into an SSA value. The data is attached
+        to the operation as an attribute. For example:
+
+        ```mlir
+          %0 = cal.constant 42 : i32
+        ```
+      }];
+
+    let arguments = (ins AnyAttr:$value);
+
+    let results = (outs AnyType:$res);
+
+    let builders = [
+        OpBuilder<(ins "Attribute":$value),
+           [{ build($_builder, $_state, value.getType(), value); }]>,
+           OpBuilder<(ins "Attribute":$value, "Type":$type),
+           [{ build($_builder, $_state, type, value); }]>,
+
+        // Build a constant with a given constant floating-point value.
+        OpBuilder<(ins "long":$value)>
+      ];
+
+    let printer = "return ::print(p, *this);";
+    let parser = "return ::parse$cppClass(parser, result);";
+    let verifier = "return ::verify$cppClass(*this);";
 }
