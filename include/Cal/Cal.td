@@ -29,13 +29,34 @@ def CalDialect : Dialect {
     }];
     let cppNamespace = "::streamblocks::cal";
     let extraClassDeclaration = [{
-    /// Register all Cal types.
-    void registerTypes();
-    /// Register all Cal attributes.
-    void registerAttributes();
+        /// Register all Cal types.
+        void registerTypes();
+        /// Register all Cal attributes.
+        void registerAttributes();
     }];
 }
 
+//===----------------------------------------------------------------------===//
+// Cal types
+//===----------------------------------------------------------------------===//
+
+def CalIntType     : Type<CPred<"$_self.isa<cal::IntType>()">, "IntType">;
+def CalUIntType    : Type<CPred<"$_self.isa<cal::UIntType>()">, "UIntType">;
+def CalRealType    : Type<CPred<"$_self.isa<cal::RealType>()">, "RealType">;
+def CalLogicalType : Type<CPred<"$_self.isa<cal::LogicalType>()">, "LogicalType">;
+
+def CalBool :
+  Type<CPred<"$_self.isa<::LogicalType>() && $_self.cast<::LogicalType>().getWidth() == 1">, "bool">,
+  BuildableType<"LogicalType::get($_builder.getContext(), 1)">;
+
+def CalType : AnyTypeOf<[
+    CalIntType,
+    CalUIntType,
+    CalRealType,
+    CalLogicalType
+]>;
+
+def CalNumericType : AnyTypeOf<[CalIntType, CalUIntType, CalRealType]>;
 //===----------------------------------------------------------------------===//
 // Base cal operation definition.
 //===----------------------------------------------------------------------===//

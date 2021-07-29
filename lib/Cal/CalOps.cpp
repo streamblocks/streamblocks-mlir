@@ -308,7 +308,7 @@ static ParseResult parseConstantOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &printer, ConstantOp op) {
-  printer << "cal.constant";
+  printer << "cal.constant ";
   printer.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
   printer << op.value();
 }

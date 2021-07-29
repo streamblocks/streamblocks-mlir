@@ -15,6 +15,7 @@
 #include "AST/AST.h"
 #include "Cal/CalDialect.h"
 #include "Cal/CalOps.h"
+//#include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -80,6 +81,14 @@ public:
 
     theModule.push_back(theNamespace);
 
+    // Verify the module after we have finished constructing it, this will check
+    // the structural properties of the IR and invoke any specific verifiers we
+    // have on the Toy operations.
+    if (failed(mlir::verify(theModule))) {
+      theModule.emitError("module verification error");
+      return nullptr;
+    }
+
     return theModule;
   }
 
@@ -105,6 +114,10 @@ private:
   llvm::StringMap<streamblocks::cal::ActorOp> actorMap;
 
   mlir::Value mlirGen(cal::ExprLiteralLong &literal) {
+
+    // return builder.create<ConstantIntOp>(loc(literal.loc()),
+    // literal.getValue(), 32);
+
     return builder.create<ConstantOp>(loc(literal.loc()), literal.getValue());
   }
 
@@ -120,16 +133,15 @@ private:
     }
   }
 
-  Operation *mlirGen(cal::StmtCall &call) {
+  mlir::LogicalResult mlirGen(cal::StmtCall &call) {
     auto location = loc(call.loc());
 
-    Operation *op;
     // Codegen the operands
     SmallVector<mlir::Value, 4> operands;
     for (auto &expr : call.getArguments()) {
       auto arg = mlirGen(*expr);
       if (!arg) {
-        return nullptr;
+        return mlir::failure();
       }
       operands.push_back(arg);
     }
@@ -140,26 +152,29 @@ private:
         cal::ExprVariable *callee =
             cast<cal::ExprVariable>(call.getProcedure());
         if (callee->getName() == "println") {
-          op = builder.create<PrintlnOp>(location, operands[0]);
+          builder.create<PrintlnOp>(location, operands.front());
         } else if (callee->getName() == "print") {
-          op = builder.create<PrintOp>(location, operands[0]);
+          builder.create<PrintOp>(location, operands.front());
         }
       }
     }
 
-    return op;
+    return mlir::success();
   }
 
-  Operation *mlirGen(cal::Statement &stmt) {
+  mlir::LogicalResult mlirGen(cal::Statement &stmt) {
     switch (stmt.getKind()) {
     case cal::Statement::Stmt_Call:
-      return mlirGen(cast<cal::StmtCall>(stmt));
+      if (mlir::failed(mlirGen(cast<cal::StmtCall>(stmt)))) {
+        return mlir::success();
+      }
+      break;
     default:
       emitError(loc(stmt.loc())) << "Statement not currently supported '"
                                  << Twine(stmt.getKind()) << "'";
     }
 
-    return nullptr;
+    return mlir::success();
   }
 
   streamblocks::cal::ActorOp mlirGen(cal::CalActor &actor) {
@@ -186,12 +201,16 @@ private:
       auto theProcess =
           builder.create<ProcessOp>(loc(actor.getProcess()->loc()), repeat);
 
+      builder.setInsertionPointToStart(theProcess.getBody());
+
       // Visit its statements and create an operation for each
       for (auto &stmt : process->getStatements()) {
-        auto *op = mlirGen(*stmt);
-        theProcess.push_back(op);
+        if (mlir::failed(mlirGen(*stmt))) {
+          return nullptr;
+        }
       }
 
+      builder.clearInsertionPoint();
       theActor.getBody()->push_back(theProcess);
     }
 
