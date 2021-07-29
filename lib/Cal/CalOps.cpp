@@ -27,7 +27,7 @@ void NamespaceOp::build(OpBuilder &builder, OperationState &result,
   using namespace mlir::function_like_impl;
 
   // Namespace QID
-  result.addAttribute(::mlir::SymbolTable::getSymbolAttrName(), name);
+  result.addAttribute("qid", name);
 
   // Create a single-blocked region.
   result.addRegion();
