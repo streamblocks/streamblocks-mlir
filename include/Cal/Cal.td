@@ -17,6 +17,10 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/RegionKindInterface.td"
 
+class AssemblyFormat<string format> {
+  string assemblyFormat = format;
+}
+
 //===----------------------------------------------------------------------===//
 // Cal dialect definition.
 //===----------------------------------------------------------------------===//
@@ -41,9 +45,12 @@ def CalDialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 def CalIntType     : Type<CPred<"$_self.isa<cal::IntType>()">, "IntType">;
-def CalUIntType    : Type<CPred<"$_self.isa<cal::UIntType>()">, "UIntType">;
 def CalRealType    : Type<CPred<"$_self.isa<cal::RealType>()">, "RealType">;
 def CalLogicalType : Type<CPred<"$_self.isa<cal::LogicalType>()">, "LogicalType">;
+
+// User Types
+def CalProductType : Type<CPred<"$_self.isa<cal::ProductType>()">, "ProductType">;
+def CalSumType : Type<CPred<"$_self.isa<cal::SumType>()">, "SumType">;
 
 def CalBool :
   Type<CPred<"$_self.isa<::LogicalType>() && $_self.cast<::LogicalType>().getWidth() == 1">, "bool">,
@@ -51,12 +58,11 @@ def CalBool :
 
 def CalType : AnyTypeOf<[
     CalIntType,
-    CalUIntType,
     CalRealType,
     CalLogicalType
 ]>;
 
-def CalNumericType : AnyTypeOf<[CalIntType, CalUIntType, CalRealType]>;
+def CalNumericType : AnyTypeOf<[CalIntType, CalRealType]>;
 //===----------------------------------------------------------------------===//
 // Base cal operation definition.
 //===----------------------------------------------------------------------===//
@@ -79,6 +85,12 @@ class CalContainer<string mnemonic, list<OpTrait> traits = []> :
     Block *getBody() { return &getOperation()->getRegion(0).front(); }
     }];
 }
+
+class ArithmeticOp<string mnemonic, list<OpTrait> traits = []> :
+    CalOp<mnemonic, !listconcat(traits, [SameOperandsAndResultType])>,
+    Arguments<(ins AnyType:$lhs, AnyType:$rhs)>,
+    Results<(outs AnyType:$result)>,
+    AssemblyFormat<"attr-dict $lhs `,` $rhs `:` type($rhs)">;
 
 include "CalStructure.td"
 
