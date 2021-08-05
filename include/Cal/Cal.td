@@ -32,7 +32,12 @@ def CalDialect : Dialect {
         Cal is a general purpose dataflow programming language.
     }];
     let cppNamespace = "::streamblocks::cal";
+    let hasConstantMaterializer = 1;
     let extraClassDeclaration = [{
+        mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
+        void printType(mlir::Type type,
+            mlir::DialectAsmPrinter &printer) const override;
+    private:
         /// Register all Cal types.
         void registerTypes();
         /// Register all Cal attributes.
@@ -50,7 +55,7 @@ def CalLogicalType : Type<CPred<"$_self.isa<cal::LogicalType>()">, "LogicalType"
 
 // User Types
 def CalProductType : Type<CPred<"$_self.isa<cal::ProductType>()">, "ProductType">;
-def CalSumType : Type<CPred<"$_self.isa<cal::SumType>()">, "SumType">;
+//def CalSumType : Type<CPred<"$_self.isa<cal::SumType>()">, "SumType">;
 
 def CalBool :
   Type<CPred<"$_self.isa<::LogicalType>() && $_self.cast<::LogicalType>().getWidth() == 1">, "bool">,

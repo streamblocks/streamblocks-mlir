@@ -10,8 +10,7 @@
 // NamespaceOp
 
 def NamespaceOp : CalContainer<"namespace", [
-    IsolatedFromAbove,
-    SymbolTable
+    IsolatedFromAbove
     ]>{
 
     let summary = "Cal Namespace";
@@ -189,7 +188,10 @@ def PrintlnOp : CalOp<"println"> {
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
 
-def ConstantOp : CalOp<"constant", [ConstantLike, NoSideEffect]> {
+//===----------------------------------------------------------------------===//
+// ConstantOp
+
+def ConstantOp : CalOp<"constant", [NoSideEffect]> {
     let summary = "constant";
     let description = [{
         Constant operation turns a literal into an SSA value. The data is attached

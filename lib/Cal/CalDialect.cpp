@@ -8,6 +8,7 @@
 
 #include "Cal/CalDialect.h"
 #include "Cal/CalOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace streamblocks::cal;
@@ -23,5 +24,11 @@ void CalDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "Cal/Cal.cpp.inc"
-  >();
+      >();
+}
+
+Operation *CalDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                           Type type, Location loc) {
+  return llvm::TypeSwitch<Type, Operation *>(type).Default(
+      [&](auto type) { return builder.create<ConstantOp>(loc, type, value); });
 }

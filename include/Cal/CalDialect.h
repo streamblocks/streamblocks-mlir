@@ -9,6 +9,8 @@
 #ifndef CAL_CALDIALECT_H
 #define CAL_CALDIALECT_H
 
+
+
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -26,6 +28,8 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Interfaces/CastInterfaces.h"
+
+#include "Cal/CalTypes.h"
 
 using namespace mlir;
 

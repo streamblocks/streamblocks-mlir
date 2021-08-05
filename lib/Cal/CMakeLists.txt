@@ -1,4 +1,5 @@
 add_mlir_dialect_library(MLIRCal
+		CalTypes.cpp
         CalDialect.cpp
 		CalOps.cpp
 		LowerToStd.cpp
