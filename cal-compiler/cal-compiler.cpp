@@ -4,6 +4,7 @@
 #include "AST/AST.h"
 
 #include "Cal/CalDialect.h"
+#include "Cal/Passes.h"
 
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -51,7 +52,7 @@ enum Action {
   None,
   DumpAST,
   DumpMLIR,
-  DumpMLIRAffine,
+  DumpMLIRSTD,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
@@ -62,7 +63,7 @@ static cl::opt<enum Action> emitAction(
     "emit", cl::desc("Select the kind of output desired"),
     cl::values(clEnumValN(DumpAST, "ast", "output the AST dump")),
     cl::values(clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")),
-    cl::values(clEnumValN(DumpMLIRAffine, "mlir-affine",
+    cl::values(clEnumValN(DumpMLIRSTD, "mlir-std",
                           "output the MLIR dump after affine lowering")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
@@ -134,7 +135,7 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
   applyPassManagerCLOptions(pm);
 
   // Check to see what granularity of MLIR we are compiling to.
-  bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
+  bool isLoweringToAffine = emitAction >= Action::DumpMLIRSTD;
   bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
 
   if (enableOpt || isLoweringToAffine) {
@@ -154,7 +155,7 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
 
     // Partially lower the toy dialect with a few cleanups afterwards.
-    //optPM.addPass(mlir::toy::createLowerToAffinePass());
+    optPM.addPass(streamblocks::cal::createLowerToStdPass());
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
 

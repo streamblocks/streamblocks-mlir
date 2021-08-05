@@ -5,10 +5,10 @@
 #ifndef CAL_DIALECT_PASSES_H
 #define CAL_DIALECT_PASSES_H
 
-#include <memory>
 #include "mlir/Pass/Pass.h"
+#include <memory>
 
-namespace streamblocsk {
+namespace streamblocks {
 
 namespace cal {
 
@@ -20,6 +20,6 @@ std::unique_ptr<mlir::Pass> createLowerToStdPass();
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
 } // end namespace cal
-} // namespace streamblocsk
+} // end namespace streamblocks
 
 #endif // CAL_DIALECT_PASSES_H

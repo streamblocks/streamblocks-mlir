@@ -35,4 +35,6 @@ using namespace mlir;
 
 #include "Cal/CalDialect.h.inc"
 
+Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type, mlir::Location loc);
+
 #endif // CAL_CALDIALECT_H

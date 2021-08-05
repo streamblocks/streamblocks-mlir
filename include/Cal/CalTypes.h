@@ -26,13 +26,23 @@ class IntType : public mlir::Type::TypeBase<IntType, mlir::Type,
 public:
   using Base::Base;
 
-  static IntType get(mlir::MLIRContext *ctx, int width);
+  /// Signedness semantics.
+  enum SignednessSemantics : uint32_t {
+    Signed,   /// Signed integer
+    Unsigned, /// Unsigned integer
+  };
+
+  /// Return true if this is a signed integer type.
+  bool isSigned() const { return getSignedness() == Signed; }
+  /// Return true if this is an unsigned integer type.
+  bool isUnsigned() const { return getSignedness() == Unsigned; }
+
+  static IntType get(mlir::MLIRContext *ctx, int width, SignednessSemantics signedness = Signed);
 
   /// Return the bit width of this type.
   int getWidth();
 
-  /// Return if the integer is signed
-  bool isSigned();
+  SignednessSemantics getSignedness() const;
 };
 
 class LogicalType : public mlir::Type::TypeBase<LogicalType, mlir::Type,
@@ -51,6 +61,7 @@ class RealType
 public:
   using Base::Base;
 };
+
 
 } // namespace cal
 } // namespace streamblocks

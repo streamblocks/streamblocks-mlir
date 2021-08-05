@@ -41,12 +41,13 @@ public:
     addConversion([&](streamblocks::cal::IntType type) {
       return IntegerType::get(type.getContext(), type.getWidth());
     });
+    /*
     addConversion([&](streamblocks::cal::LogicalType type) {
       return IntegerType::get(type.getContext(), type.getWidth());
     });
     addConversion([&](streamblocks::cal::RealType type) {
       return FloatType::getF32(type.getContext());
-    });
+    });*/
   }
 };
 
@@ -61,6 +62,8 @@ struct ConstantOpLowering
     return success();
   }
 };
+
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // CalToStdLoweringPass
@@ -86,5 +89,19 @@ void CalToStdLoweringPass::runOnOperation() {
   target.addLegalOp<streamblocks::cal::ActorOp>();
 
   target.addLegalDialect<streamblocks::cal::CalDialect>();
+
+  CalTypeConverter converter{};
+
+  RewritePatternSet patterns(context);
+  patterns.add<ConstantOpLowering>(converter, context);
+
+  if (failed(
+          applyPartialConversion(getOperation(), target, std::move(patterns))))
+    signalPassFailure();
 }
-} // namespace
+
+/// Create a pass for lowering operations in the `Affine` and `Std` dialects,
+/// for a subset of the Toy IR (e.g. matmul).
+std::unique_ptr<Pass> streamblocks::cal::createLowerToStdPass() {
+  return std::make_unique<CalToStdLoweringPass>();
+}
