@@ -1,11 +1,13 @@
 #include <iostream>
 
-#include "driver.h"
 #include "AST/AST.h"
+#include "driver.h"
 
 #include "Cal/CalDialect.h"
+#include "Cal/CalOps.h"
 #include "Cal/Passes.h"
 
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/AsmState.h"
@@ -52,7 +54,7 @@ enum Action {
   None,
   DumpAST,
   DumpMLIR,
-  DumpMLIRSTD,
+  DumpMLIRStd,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
@@ -63,7 +65,7 @@ static cl::opt<enum Action> emitAction(
     "emit", cl::desc("Select the kind of output desired"),
     cl::values(clEnumValN(DumpAST, "ast", "output the AST dump")),
     cl::values(clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")),
-    cl::values(clEnumValN(DumpMLIRSTD, "mlir-std",
+    cl::values(clEnumValN(DumpMLIRStd, "mlir-std",
                           "output the MLIR dump after affine lowering")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
@@ -84,7 +86,6 @@ std::unique_ptr<::cal::NamespaceDecl> parseInputFile(llvm::StringRef filename) {
     return nullptr;
   }
 
-
   if (!drv.parse(std::string(filename))) {
     return std::move(drv.result);
   } else {
@@ -92,7 +93,6 @@ std::unique_ptr<::cal::NamespaceDecl> parseInputFile(llvm::StringRef filename) {
     return nullptr;
   }
 }
-
 
 int loadMLIR(mlir::MLIRContext &context, mlir::OwningModuleRef &module) {
   // Handle '.toy' input to the compiler.
@@ -124,7 +124,6 @@ int loadMLIR(mlir::MLIRContext &context, mlir::OwningModuleRef &module) {
   return 0;
 }
 
-
 int loadAndProcessMLIR(mlir::MLIRContext &context,
                        mlir::OwningModuleRef &module) {
   if (int error = loadMLIR(context, module))
@@ -135,40 +134,39 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
   applyPassManagerCLOptions(pm);
 
   // Check to see what granularity of MLIR we are compiling to.
-  bool isLoweringToAffine = emitAction >= Action::DumpMLIRSTD;
+  bool isLoweringToStd = emitAction >= Action::DumpMLIRStd;
   bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
 
-  if (enableOpt || isLoweringToAffine) {
+  if (enableOpt || isLoweringToStd) {
     // Inline all functions into main and then delete them.
     pm.addPass(mlir::createInlinerPass());
 
     // Now that there is only one function, we can infer the shapes of each of
     // the operations.
-    mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
-    optPM.addPass(mlir::createCanonicalizerPass());
-    //optPM.addPass(mlir::toy::createShapeInferencePass());
+    mlir::OpPassManager &optPM = pm.nest<streamblocks::cal::NamespaceOp>();
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
   }
 
-  if (isLoweringToAffine) {
-    mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
+  if (isLoweringToStd) {
+    pm.addPass(streamblocks::cal::createLowerToStdPass());
+
+    mlir::OpPassManager &optPM = pm.nest<streamblocks::cal::NamespaceOp>();
 
     // Partially lower the toy dialect with a few cleanups afterwards.
-    optPM.addPass(streamblocks::cal::createLowerToStdPass());
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
 
     // Add optimizations if enabled.
     if (enableOpt) {
       optPM.addPass(mlir::createLoopFusionPass());
-      //optPM.addPass(mlir::createAffineScalarReplacementPass());
+      optPM.addPass(mlir::createAffineScalarReplacementPass());
     }
   }
 
   if (isLoweringToLLVM) {
     // Finish lowering the toy IR to the LLVM dialect.
-    //pm.addPass(mlir::toy::createLowerToLLVMPass());
+    // pm.addPass(mlir::toy::createLowerToLLVMPass());
   }
 
   if (mlir::failed(pm.run(*module)))
@@ -263,29 +261,29 @@ int main(int argc, char *argv[]) {
 
   // If we aren't dumping the AST, then we are compiling with/to MLIR.
 
-    mlir::MLIRContext context;
-    // Load our Dialect in this MLIR Context.
-    context.getOrLoadDialect<mlir::StandardOpsDialect>();
-    context.getOrLoadDialect<streamblocks::cal::CalDialect>();
+  mlir::MLIRContext context;
+  // Load our Dialect in this MLIR Context.
+  context.getOrLoadDialect<mlir::StandardOpsDialect>();
+  context.getOrLoadDialect<streamblocks::cal::CalDialect>();
 
-    mlir::OwningModuleRef module;
-    if (int error = loadAndProcessMLIR(context, module))
-      return error;
+  mlir::OwningModuleRef module;
+  if (int error = loadAndProcessMLIR(context, module))
+    return error;
 
-    // If we aren't exporting to non-mlir, then we are done.
-    bool isOutputingMLIR = emitAction <= Action::DumpMLIRLLVM;
-    if (isOutputingMLIR) {
-      module->dump();
-      return 0;
-    }
+  // If we aren't exporting to non-mlir, then we are done.
+  bool isOutputingMLIR = emitAction <= Action::DumpMLIRLLVM;
+  if (isOutputingMLIR) {
+    module->dump();
+    return 0;
+  }
 
-    // Check to see if we are compiling to LLVM IR.
-    if (emitAction == Action::DumpLLVMIR)
-      return dumpLLVMIR(*module);
+  // Check to see if we are compiling to LLVM IR.
+  if (emitAction == Action::DumpLLVMIR)
+    return dumpLLVMIR(*module);
 
-    // Otherwise, we must be running the jit.
-    if (emitAction == Action::RunJIT)
-      return runJit(*module);
+  // Otherwise, we must be running the jit.
+  if (emitAction == Action::RunJIT)
+    return runJit(*module);
 
   llvm::errs() << "No action specified (parsing only?), use -emit=<action>\n";
   return -1;

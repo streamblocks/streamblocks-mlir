@@ -48,8 +48,14 @@ public:
     addConversion([&](streamblocks::cal::RealType type) {
       return FloatType::getF32(type.getContext());
     });*/
+    // keep Std types
+    addConversion([&](FloatType type) { return type; });
+    addConversion([&](IntegerType type) { return type; });
+
   }
 };
+
+
 
 struct ConstantOpLowering
     : public OpConversionPattern<streamblocks::cal::ConstantOp> {
@@ -73,7 +79,9 @@ namespace {
 struct CalToStdLoweringPass
     : public PassWrapper<CalToStdLoweringPass, OperationPass<ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<memref::MemRefDialect, StandardOpsDialect>();
+    registry.insert<scf::SCFDialect>();
+    registry.insert<memref::MemRefDialect>();
+    registry.insert<StandardOpsDialect>();
   }
   void runOnOperation() final;
 };
@@ -86,9 +94,9 @@ void CalToStdLoweringPass::runOnOperation() {
   target.addLegalDialect<scf::SCFDialect>();
   target.addLegalDialect<memref::MemRefDialect>();
   target.addLegalDialect<StandardOpsDialect>();
-  target.addLegalOp<streamblocks::cal::ActorOp>();
+  target.addLegalOp<streamblocks::cal::ProcessOp>();
 
-  target.addLegalDialect<streamblocks::cal::CalDialect>();
+  //target.addIllegalDialect<streamblocks::cal::CalDialect>();
 
   CalTypeConverter converter{};
 
