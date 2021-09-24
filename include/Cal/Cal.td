@@ -78,6 +78,7 @@ class CalOp<string mnemonic, list<OpTrait> traits = []> :
 
 class CalContainer<string mnemonic, list<OpTrait> traits = []> :
     CalOp<mnemonic, !listconcat(traits, [
+            IsolatedFromAbove,
             NoRegionArguments,
             NoTerminator,
             SingleBlock

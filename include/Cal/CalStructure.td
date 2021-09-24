@@ -126,7 +126,7 @@ def ActorOp: CalOp<"actor", [
             unsigned getNumFuncResults() { return getType().getNumResults(); }
 
         public:
-            /// Returns the body of a Calyx component.
+            /// Returns the body of the Actor component.
             Block *getBody() { return &getOperation()->getRegion(0).front(); }
 
       }];
@@ -139,8 +139,11 @@ def ActorOp: CalOp<"actor", [
 //===----------------------------------------------------------------------===//
 // ProcessOp
 
-def ProcessOp: CalContainer<"process", [
-    HasParent<"ActorOp">
+def ProcessOp: CalOp<"process", [
+    HasParent<"ActorOp">,
+    IsolatedFromAbove,
+    SingleBlock,
+    NoTerminator
     ]>{
     let summary = "A KPN Process description";
 
@@ -152,9 +155,21 @@ def ProcessOp: CalContainer<"process", [
     let arguments = (ins);
     let results = (outs);
 
+    let regions = (region SizedRegion<1>: $body);
+
     let builders = [
             OpBuilder<(ins "BoolAttr":$repeat)>
     ];
+
+    let extraClassDeclaration = [{
+        public:
+            /// Returns the body of the process
+            Block *getBody() { return &getOperation()->getRegion(0).front(); }
+      }];
+
+    let printer = "return ::print(p, *this);";
+    let parser = "return ::parse$cppClass(parser, result);";
+    let verifier = "return ::verify$cppClass(*this);";
 
 }
 

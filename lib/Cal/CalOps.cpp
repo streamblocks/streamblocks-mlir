@@ -262,19 +262,44 @@ void ActorOp::build(OpBuilder &builder, OperationState &result, StringAttr name,
 // ProcessOp
 
 static ParseResult parseProcessOp(OpAsmParser &parser, OperationState &result) {
+  using namespace mlir::function_like_impl;
+
+  auto *body = result.addRegion();
+  if (parser.parseRegion(*body))
+    return failure();
+
+  if (body->empty())
+    body->push_back(new Block());
+
   return success();
 }
 
-static void print(OpAsmPrinter &p, ProcessOp op) {}
+static void print(OpAsmPrinter &p, ProcessOp op) {
+
+  p << "cal.process ";
+
+  p.printRegion(op.body(), /*printBlockTerminators=*/false,
+                /*printEmptyBlock=*/false);
+  if(op->hasAttr("repeat")){
+    p << " {repeat = ";
+    p.printAttribute(op->getAttr("repeat"));
+    p << "}";
+  }
+}
 
 static LogicalResult verifyProcessOp(ProcessOp op) {
   // -- TODO : Implement
   return success();
 }
 
-void ProcessOp::build(mlir::OpBuilder &builder, mlir::OperationState &result, BoolAttr repeat){
+void ProcessOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                      BoolAttr repeat) {
 
   using namespace mlir::function_like_impl;
+
+  // Build the function type of the component.
+  auto functionType = NoneType::get(builder.getContext());
+  result.addAttribute(getTypeAttrName(), TypeAttr::get(functionType));
 
   // Is it a repeat process ?
   result.addAttribute("repeat", repeat);
